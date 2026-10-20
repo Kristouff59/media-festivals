@@ -13,14 +13,14 @@ SITE=ROOT/"index.html"
 API="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 S=requests.Session()
 S.headers.update({"User-Agent":"BACKSTAGE-verification/1.0"})
-BLACKLIST=("news.google.com","google.com","lemonde.fr","infoconcert.com","ouest-france.fr","wikipedia.org","ticketmaster.fr","fnacspectacles.com")
+BLACKLIST=("news.google.com","google.com","lemonde.fr","infoconcert.com","ouest-france.fr","wikipedia.org","ticketmaster.fr","fnacspectacles.com","localhost","example.com")
 def norm(x):
     t=unicodedata.normalize("NFKD",str(x).casefold())
     return re.sub(r"[^a-z0-9]+"," ","".join(c for c in t if not unicodedata.combining(c))).strip()
 def official(url):
     try:
         p=urlparse(url);host=(p.hostname or "").lower()
-        return p.scheme=="https" and "." in host and not host.startswith(("127.","10.","192.168.")) and not any(host==b or host.endswith("."+b) for b in BLACKLIST)
+        return p.scheme=="https" and "." in host and not host.startswith(("127.","10.","192.168.","169.254.","172.16.")) and not any(host==b or host.endswith("."+b) for b in BLACKLIST)
     except (TypeError,ValueError):return False
 def call(key,prompt,search=False):
     config={"temperature":0.2 if search else 0.7,"maxOutputTokens":5000}
@@ -50,7 +50,7 @@ def proof(item):
     for e in item.get("evidence",[]):
         q=norm(e.get("quote",""))
         if len(q)>=28 and q in page:found.append(q)
-    if len(found)<2:raise ValueError("Deux citations exactes introuvables sur la source officielle")
+    if len(found)<3:raise ValueError("Trois citations exactes introuvables sur la source officielle")
     return url,page,found
 def write_site(article):
     h=SITE.read_text(encoding="utf-8")
@@ -61,7 +61,7 @@ def write_site(article):
     if not isinstance(title,str) or not 20<len(title)<140:raise ValueError("Titre invalide")
     if len(prose)<3 or not all(isinstance(p,str) and 50<len(p)<1700 for p in prose):raise ValueError("Paragraphes invalides")
     count=len(" ".join(prose).split())
-    if count<170 or count>850:raise ValueError("Longueur éditoriale inadaptée")
+    if count<130 or count>850:raise ValueError("Longueur éditoriale inadaptée")
     if not isinstance(article.get("excerpt"),str) or not 65<len(article["excerpt"])<350:raise ValueError("Chapô invalide")
     if article.get("category") not in ("FESTIVALS","CONCERTS","SOCIÉTÉ"):raise ValueError("Rubrique invalide")
     if article["category"]=="SOCIÉTÉ" and count<400:raise ValueError("Décryptage trop court")
@@ -88,7 +88,8 @@ du producteur ou d'une institution. NE JAMAIS utiliser un article de presse
 comme source officielle. Réponds UNIQUEMENT avec cet objet JSON :
 {"confirmable":true,"url":"https://url-officielle","evidence":[
 {"quote":"extrait EXACT de 30 à 130 caractères figurant réellement sur cette page"},
-{"quote":"second extrait EXACT de cette même page"}]}.
+{"quote":"second extrait EXACT de cette même page"},
+{"quote":"troisième extrait EXACT de cette même page"}]}.
 Si ce n'est pas vérifiable : {"confirmable":false,"url":"","evidence":[]}.
 Pas de phrases imaginées. Recherche uniquement des faits réels et récents.""",True)
     if research.get("confirmable") is not True:raise ValueError("Annonce non confirmée")
@@ -105,7 +106,8 @@ Le ton peut être imagé sans inventer d'ambiance vécue.
 Piste : """+item["titre"]+"""
 Lien officiel : """+url+"""
 PREUVES TEXTUELLES vérifiées : """+"\n".join(quotes)+"""
-Rédige en français 200 à 400 mots (plus long seulement si justifié).
+Rédige en français une brève vivante de 140 à 220 mots si les faits sont rares,
+ou un article de 250 à 450 mots si les preuves permettent un vrai contexte.
 Le lecteur doit comprendre l'annonce et pourquoi elle compte.
 Réponds UNIQUEMENT en JSON :
 {"title":"titre", "excerpt":"chapô", "category":"CONCERTS ou FESTIVALS ou SOCIÉTÉ",
