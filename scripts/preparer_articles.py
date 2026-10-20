@@ -163,10 +163,12 @@ pour un décryptage, conséquences concrètes. Omettre cette section si inutile.
 """
 
 
-def prepare(files: list[Path], max_per_file: int = 3) -> list[Path]:
+def prepare(files: list[Path], max_per_run: int = 3) -> list[Path]:
     created = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     outputs = []
     for file in files:
+        if len(outputs) >= max_per_run:
+            break
         if not file.exists():
             continue
         candidates = parse_digest(file.read_text(encoding="utf-8"))
@@ -175,7 +177,9 @@ def prepare(files: list[Path], max_per_file: int = 3) -> list[Path]:
         # La date du digest est la date de sélection, pas une preuve de la date de l'événement.
         subdir = DRAFTS / file.stem.split("T")[0]
         subdir.mkdir(parents=True, exist_ok=True)
-        for item in candidates[:max_per_file]:
+        for item in candidates:
+            if len(outputs) >= max_per_run:
+                break
             dest = subdir / (slug(item["titre"]) + ".md")
             if dest.exists():
                 continue
@@ -205,16 +209,16 @@ def self_test():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-test", action="store_true")
-    parser.add_argument("--max-per-file", type=int, default=3)
+    parser.add_argument("--max-per-run", type=int, default=3)
     parser.add_argument("files", nargs="*", type=Path)
     args = parser.parse_args()
     if args.self_test:
         self_test()
         return
-    if not 1 <= args.max_per_file <= 5:
+    if not 1 <= args.max_per_run <= 5:
         parser.error("La limite doit être comprise entre 1 et 5")
     files = args.files or sorted(CANDIDATES.glob(datetime.now(timezone.utc).strftime("%Y-%m-%d") + "*.md"))
-    created = prepare(files, args.max_per_file)
+    created = prepare(files, args.max_per_run)
     print(f"Fiches de rédaction préparées : {len(created)}")
     for path in created:
         print(f"  {path.relative_to(ROOT)}")
