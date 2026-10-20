@@ -30,7 +30,7 @@ peuvent changer. Le modèle choisi est `gemini-2.5-flash` avec recherche Google.
 3. Le moteur recherche sur le Web une **source primaire** : site officiel
    d'artiste, d'organisateur ou d'institution (et non un article de presse).
 4. Il exige plusieurs extraits factuels, puis ouvre la page officielle et
-   cherche **au moins deux extraits exactement présents** sur la page.
+   cherche **au moins trois extraits exactement présents** sur la page.
 5. Si l'étape échoue, ce sujet est abandonné sans publication.
 6. Le moteur rédige un article original, plus humain et plus incarné, fondé
    uniquement sur les éléments corroborés.
