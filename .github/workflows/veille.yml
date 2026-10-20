@@ -55,6 +55,17 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Contrôler la syntaxe du magazine après rédaction
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html','utf8');
+          const scripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)].map(m => m[1]);
+          if (scripts.length < 2) throw new Error('Scripts du site absents');
+          fs.writeFileSync('/tmp/backstage-editorial.js', scripts.join('\\n'));
+          NODE
+          node --check /tmp/backstage-editorial.js
       - name: Soumettre l'article validé techniquement pour approbation
         uses: peter-evans/create-pull-request@v7
         with:
