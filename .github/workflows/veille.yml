@@ -1,0 +1,36 @@
+name: BACKSTAGE — veille officielle
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 7 * * *'
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer les dépendances
+        run: python -m pip install -r scripts/requirements.txt
+      - name: Relever les changements
+        run: python scripts/veille.py
+      - name: Ouvrir une proposition de relecture
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bot/veille-festivals
+          delete-branch: true
+          title: 'BACKSTAGE — changements de festivals à vérifier'
+          commit-message: 'veille: proposer les nouveaux changements officiels'
+          body: |
+            Veille automatique : première exécution = établissement des références, pas une actualité.
+            Les pages sources peuvent changer sans annoncer une nouveauté.
+            Vérifier chaque extrait directement sur son lien officiel AVANT de fusionner.
+            Aucun article ni message sur un réseau social n'est publié automatiquement.
+          add-paths: |
+            data/source_state.json
+            data/review_queue/*.json
