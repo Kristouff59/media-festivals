@@ -1,123 +1,188 @@
 #!/usr/bin/env python3
-"""Veille quotidienne de pages officielles : uniquement des brouillons à relire."""
+"""Radar éditorial BACKSTAGE : découvertes de titres RSS, jamais publication automatique.
+
+Les flux Google Actualités sont un canal de découverte non officiel et non garanti.
+Toute information publiée doit ensuite être confirmée par la source primaire.
+"""
 import hashlib
 import json
 import re
 import sys
-from datetime import datetime, timezone
+import unicodedata
+import xml.etree.ElementTree as ET
+from datetime import datetime, timedelta, timezone
+from difflib import SequenceMatcher
+from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.parse import urlparse
-from urllib.robotparser import RobotFileParser
+from urllib.parse import urlencode
 
 import requests
-from bs4 import BeautifulSoup
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = ROOT / "config/sources.json"
-STATE = ROOT / "data/source_state.json"
-QUEUE = ROOT / "data/review_queue"
-AGENT = "BackstageEditorialWatch/0.2 (low-volume source attribution; GitHub project)"
-SESSION = requests.Session()
-SESSION.headers.update({"User-Agent": AGENT, "Accept": "text/html"})
+CONF = ROOT / "config/sources.json"
+STATE = ROOT / "data/news_seen.json"
+CANDIDATES = ROOT / "data/candidats"
+MAX_FEED_ENTRIES = 35
+CLIENT = requests.Session()
+CLIENT.headers.update({"User-Agent": "BACKSTAGE/0.3 (RSS editorial discovery)", "Accept": "application/rss+xml, application/xml, text/xml"})
 
+def plain(value):
+    value = unicodedata.normalize("NFKD", value.lower())
+    return "".join(c for c in value if not unicodedata.combining(c))
 
-def digest(s):
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+def clean_title(title, publisher):
+    title = re.sub(r"\s+", " ", title or "").strip()
+    if publisher and title.endswith(" - " + publisher):
+        title = title[:-(len(publisher)+3)].strip()
+    return title
 
+def key(title):
+    return re.sub(r"[^a-z0-9]+", " ", plain(title)).strip()
 
-def download(url):
-    parsed = urlparse(url)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise ValueError("Source HTTPS obligatoire")
-    robot = RobotFileParser()
-    robot.set_url(f"{parsed.scheme}://{parsed.hostname}/robots.txt")
+def sha(s):
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:24]
+
+def score(headline, topic):
+    t = plain(headline)
+    festival = any(v in t for v in ("festival", "hellfest", "rock en seine", "main square", "dour ", "primavera", "sziget", "vieilles charrues", "francofolies"))
+    concert = any(v in t for v in ("concert", "tournee", "tour ", " tournée", "live ", "sur scene", "stade de france", "accor arena", "olympia", "arena ", "festiv"))
+    reunion = any(v in t for v in ("reform", "reunion", "reunite", "comeback", "retour sur scene", "return to the stage", "reunites"))
+    annonce = any(v in t for v in ("annonce", "devoile", "confirme", "programmation", "affiche", "dates", "billet", "billetterie", "sold out", "complet", "line-up", "lineup"))
+    societe = any(v in t for v in ("prix", "tarif", "revente", "arnaque", "annul", "securit", "accessibil", "pollution", "travail", "billetterie", "ticket", "econom"))
+    if not (festival or concert or reunion or (societe and topic=="societe")):
+        return 0
+    value = (5 if festival else 0) + (5 if concert else 0) + (14 if reunion else 0)
+    if annonce: value += 3
+    if societe and (concert or festival or topic=="societe"): value += 5
+    if any(v in t for v in ("france", "paris", "belgique", "suisse", "luxembourg", "bruxelles", "lyon", "lille", "marseille", "bordeaux", "allemagne")): value += 3
+    if topic in ("retours", "reunions-internationales") and reunion: value += 7
+    if topic == "societe" and societe: value += 4
+    if "playlist" in t or "streaming" in t and not (concert or festival): value -= 10
+    return value
+
+def rss_url(q, lang):
+    edition = {"hl": "fr", "gl": "FR", "ceid": "FR:fr"} if lang == "fr" else {"hl": "en", "gl": "US", "ceid": "US:en"}
+    return "https://news.google.com/rss/search?" + urlencode({"q": q, **edition})
+
+def fetch_rss(url):
+    response = CLIENT.get(url, timeout=20)
+    response.raise_for_status()
+    if len(response.content) > 1500000:
+        raise ValueError("Flux anormalement volumineux")
+    root = ET.fromstring(response.content)
+    if root.tag != "rss":
+        raise ValueError("Format RSS inattendu")
+    return root.findall("./channel/item")[:MAX_FEED_ENTRIES]
+
+def parse_item(item, theme, now):
+    publisher = (item.findtext("source") or "").strip()
+    title = clean_title(item.findtext("title"), publisher)
+    link = (item.findtext("link") or "").strip()
+    date_text = item.findtext("pubDate")
+    if not title or not link.startswith("https://") or not date_text:
+        return None
     try:
-        response = SESSION.get(robot.url, timeout=12)
-        if response.ok:
-            robot.parse(response.text.splitlines())
-            if not robot.can_fetch(AGENT, url):
-                raise ValueError("Accès automatisé interdit par robots.txt")
-    except requests.RequestException:
-        # Refuser par prudence si l'autorisation ne peut pas être contrôlée.
-        raise ValueError("Impossible de vérifier robots.txt")
-    with SESSION.get(url, timeout=20, stream=True) as response:
-        response.raise_for_status()
-        parts, size = [], 0
-        for chunk in response.iter_content(16384):
-            size += len(chunk)
-            if size > 1500000:
-                raise ValueError("Page trop volumineuse (>1,5 Mo)")
-            parts.append(chunk)
-        html = b"".join(parts).decode(response.encoding or "utf-8", errors="replace")
-    return html
+        date = parsedate_to_datetime(date_text).astimezone(timezone.utc)
+    except (ValueError, TypeError, IndexError):
+        return None
+    if date < now - timedelta(days=8) or date > now + timedelta(days=1):
+        return None
+    relevance = score(title, theme["id"])
+    if relevance < 7:
+        return None
+    normalized = key(title)
+    if len(normalized) < 18:
+        return None
+    return {
+        "titre": title, "source_media": publisher or "Média non précisé",
+        "lien_decouverte": link, "date_source": date.isoformat(timespec="minutes"),
+        "theme": theme["nom"], "score": relevance, "normalized": normalized, "key": sha(normalized)
+    }
 
-
-def meaningful_lines(html, selector):
-    soup = BeautifulSoup(html, "html.parser")
-    main = soup.select_one(selector) if selector else None
-    main = main or soup.find("main") or soup.find("body")
-    if main is None:
-        raise ValueError("Pas de contenu exploitable")
-    for el in main.select("script,style,noscript,nav,footer,form,svg,button"):
-        el.decompose()
-    lines = []
-    for s in main.stripped_strings:
-        value = re.sub(r"\s+", " ", s).strip()
-        if 12 <= len(value) <= 220 and value not in lines:
-            lines.append(value)
-        if len(lines) >= 250:
-            break
-    if len(lines) < 3:
-        raise ValueError("Contenu extrait insuffisant")
-    return lines
-
+def make_digest(items, day):
+    lines = [
+        "# BACKSTAGE — propositions du " + day,
+        "",
+        "**Brouillons de veille, PAS des actualités validées.** Les titres proviennent d'un flux",
+        "d'agrégation. Un titre ou une source secondaire ne confirme pas une annonce.",
+        "Avant toute publication, trouver l'annonce d'un artiste, festival, tourneur ou organisateur,",
+        "contrôler les dates et écrire un texte original. Ne pas copier le contenu des médias.",
+        ""
+    ]
+    for n, item in enumerate(items, 1):
+        lines.extend([
+            "## " + str(n) + ". " + item["titre"],
+            "- **Thème :** " + item["theme"],
+            "- **Priorité indicative :** " + str(item["score"]) + " (filtre automatique, pas une preuve)",
+            "- **Signalé par :** " + item["source_media"],
+            "- **Date du signalement :** " + item["date_source"],
+            "- **Lien de découverte :** " + item["lien_decouverte"],
+            "- **Statut :** À vérifier sur une source officielle avant publication",
+            ""
+        ])
+    return "\n".join(lines)
 
 def run():
-    sources = json.loads(SOURCES.read_text(encoding="utf-8"))
-    if len(sources) > 25:
-        raise ValueError("25 sources maximum")
+    config = json.loads(CONF.read_text(encoding="utf-8"))
+    themes = config["themes"]
+    now = datetime.now(timezone.utc)
     old = json.loads(STATE.read_text(encoding="utf-8")) if STATE.exists() else {}
-    new = dict(old)
-    QUEUE.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    changed = 0
-    for source in sources:
-        if not source.get("actif", False):
-            continue
+    seen = old.get("seen", {})
+    found = []
+    fetched = 0
+    for theme in themes:
         try:
-            url = source["url"]
-            lines = meaningful_lines(download(url), source.get("selector", "main"))
-            hashes = [digest(line) for line in lines]
-            previous = old.get(source["id"], {}).get("hashes")
-            new[source["id"]] = {"hashes": hashes, "url": url}
-            if previous is None:
-                print(f"{source['nom']}: référence initiale (pas d'alerte)")
-                continue
-            added = [v for v, h in zip(lines, hashes) if h not in set(previous)]
-            if not added:
-                print(f"{source['nom']}: aucun nouveau texte")
-                continue
-            snippet = " | ".join(added)[:550]
-            identifier = digest(source["id"] + snippet)[:12]
-            record = {
-                "statut": "A_VERIFIER_AVANT_PUBLICATION",
-                "festival": source["nom"],
-                "source_officielle": url,
-                "detecte_le_utc": now,
-                "texte_nouveau_court": snippet,
-                "instruction": "Comparer avec la source officielle. Un changement de page n'est pas nécessairement une annonce."
-            }
-            out = QUEUE / f"{source['id']}-{identifier}.json"
-            if not out.exists():
-                out.write_text(json.dumps(record, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
-                changed += 1
-            print(f"{source['nom']}: changement potentiel détecté")
-        except Exception as err:
-            print(f"AVERTISSEMENT: {source.get('nom')}: {err}", file=sys.stderr)
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps(new, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
-    print(f"Brouillons à vérifier créés : {changed}")
+            entries = fetch_rss(rss_url(theme["requete"], theme["langue"]))
+            fetched += 1
+            print(theme["nom"] + " : " + str(len(entries)) + " titres consultés")
+            for entry in entries:
+                suggestion = parse_item(entry, theme, now)
+                if suggestion:
+                    found.append(suggestion)
+        except (requests.RequestException, ET.ParseError, ValueError) as exc:
+            print("ATTENTION — échec flux " + theme["nom"] + " : " + str(exc), file=sys.stderr)
+    if not fetched:
+        print("ERREUR : aucun flux joignable, rien enregistré", file=sys.stderr)
+        raise SystemExit(1)
 
+    # Un même sujet paraît parfois dans plusieurs flux ou sous des titres presque identiques.
+    unique = []
+    for item in sorted(found, key=lambda x: (x["score"], x["date_source"]), reverse=True):
+        if item["key"] in seen:
+            continue
+        if any(SequenceMatcher(None, item["normalized"], prev["normalized"]).ratio() > .82 for prev in unique):
+            continue
+        unique.append(item)
+    top = unique[:int(config.get("max_articles_par_veille", 7))]
+    if top:
+        CANDIDATES.mkdir(parents=True, exist_ok=True)
+        filename = CANDIDATES / (now.strftime("%Y-%m-%d") + ".md")
+        # Inclure les suggestions cumulées si deux passages ont lieu le même jour.
+        if filename.exists():
+            filename = CANDIDATES / (now.strftime("%Y-%m-%dT%H%M") + ".md")
+        filename.write_text(make_digest(top, now.strftime("%d/%m/%Y")), encoding="utf-8")
+    # Conserver une mémoire des résultats éligibles pour ne pas reproposer les mêmes articles.
+    for item in unique:
+        seen[item["key"]] = now.isoformat(timespec="minutes")
+    # Empêcher l'augmentation sans limite de l'historique.
+    cutoff = now - timedelta(days=35)
+    seen = {k: v for k, v in seen.items() if datetime.fromisoformat(v) >= cutoff}
+    STATE.parent.mkdir(parents=True, exist_ok=True)
+    STATE.write_text(json.dumps({"seen": seen, "last_success_utc": now.isoformat(), "feeds_ok": fetched}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print("À vérifier : " + str(len(top)) + " sujet(s). Aucun article publié.")
+
+def self_test():
+    dt = datetime(2026, 10, 20, tzinfo=timezone.utc)
+    root = ET.fromstring('<rss><channel><item><title>Legendary band reunion tour - News</title><link>https://news.google.com/test</link><pubDate>Tue, 20 Oct 2026 10:00:00 GMT</pubDate><source>News</source></item></channel></rss>')
+    theme = {"id": "reunions-internationales", "nom": "Reformations"}
+    result = parse_item(root.find("./channel/item"), theme, dt)
+    assert result and result["score"] >= 20 and "Legendary" in result["titre"]
+    assert score("Album studio : nouveautés de la semaine", "concerts") == 0
+    assert score("Un festival annonce sa programmation et sa billetterie en France", "festivals") > 8
+    print("Tests de sélection RSS réussis")
 
 if __name__ == "__main__":
-    run()
+    if "--self-test" in sys.argv:
+        self_test()
+    else:
+        run()
