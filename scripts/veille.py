@@ -215,7 +215,9 @@ def self_test():
     result = parse_item(root.find("./channel/item"), theme, dt)
     assert result and result["score"] >= 10 and "Legendary" in result["titre"]
     assert score("Album studio : nouveautés de la semaine", "concerts") == 0
-    assert score("Un festival annonce sa programmation et sa billetterie en France", "festivals") > 8
+    assert score("Un festival de musique annonce ses artistes et sa billetterie en France", "festivals") > 8
+    assert score("Festival Quai des Bulles : tarifs et billetterie", "societe") < 7
+    assert score("Concert de flutes a bec au Temple reforme", "retours") < 7
     print("Tests de sélection RSS réussis")
 
 if __name__ == "__main__":
