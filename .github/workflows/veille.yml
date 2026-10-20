@@ -6,6 +6,7 @@ on:
     paths:
       - 'config/sources.json'
       - 'scripts/veille.py'
+      - 'scripts/preparer_articles.py'
       - '.github/workflows/veille.yml'
   schedule:
     - cron: '17 7,18 * * *'
@@ -27,6 +28,10 @@ jobs:
         run: python scripts/veille.py --self-test
       - name: Détecter les sujets d'actualité
         run: python scripts/veille.py
+      - name: Vérifier le préparateur éditorial
+        run: python scripts/preparer_articles.py --self-test
+      - name: Préparer les fiches d'articles non publiées
+        run: python scripts/preparer_articles.py
       - name: Proposer la sélection à relire
         uses: peter-evans/create-pull-request@v7
         with:
@@ -38,5 +43,7 @@ jobs:
             Ce dossier contient des sujets repérés par des flux d'agrégation.
             Ces titres ne sont PAS des faits vérifiés : vérifier les sources primaires.
             Ne pas reprendre le texte des médias. Aucune publication automatique.
+            Les fiches proposées dans data/brouillons contiennent des plans et des
+            vérifications à mener, pas des articles prêts à publier.
             Fusionner pour enregistrer les titres déjà vus et éviter les doublons.
           add-paths: data/
