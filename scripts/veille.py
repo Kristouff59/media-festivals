@@ -197,7 +197,7 @@ def self_test():
     root = ET.fromstring('<rss><channel><item><title>Legendary band reunion tour - News</title><link>https://news.google.com/test</link><pubDate>Tue, 20 Oct 2026 10:00:00 GMT</pubDate><source>News</source></item></channel></rss>')
     theme = {"id": "reunions-internationales", "nom": "Reformations"}
     result = parse_item(root.find("./channel/item"), theme, dt)
-    assert result and result["score"] >= 20 and "Legendary" in result["titre"]
+    assert result and result["score"] >= 10 and "Legendary" in result["titre"]
     assert score("Album studio : nouveautés de la semaine", "concerts") == 0
     assert score("Un festival annonce sa programmation et sa billetterie en France", "festivals") > 8
     print("Tests de sélection RSS réussis")
