@@ -19,6 +19,48 @@ internationaux importants. Aucun « partenariat » ou « média accrédité » s
 Le site n'est pas un agenda exhaustif des salles et ne suit pas deux salles arbitraires.
 Aucun quota mécanique. Une grande annonce mondiale vaut davantage que dix micro-brèves.
 
+## Longueur et valeur ajoutée des articles
+
+Pas de longueur imposée aveuglément : **un sujet mérite la place nécessaire, pas davantage**.
+
+| Format | Ordre de grandeur | Apport indispensable |
+|---|---:|---|
+| **Flash / brève** | 100–220 mots | Quoi, qui, où, quand, source vérifiée, lien utile |
+| **Actualité** | 250–500 mots | Faits confirmés, contexte, implications pratiques |
+| **Décryptage / dossier** | 550–1 100 mots | Question claire, points de vue attribués, documents croisés, rubriques |
+| **Reportage / entretien** | Selon la matière récoltée | Observations et propos réellement recueillis, attribution et contexte |
+
+Ces fourchettes sont des repères éditoriaux, pas des obligations.
+Une petite annonce ne doit pas être gonflée de paragraphes artificiels.
+Un sujet important ne doit pas être traité en trois phrases si des questions
+essentielles restent sans réponse.
+
+Chaque article doit apporter au moins **une valeur propre** : mise en contexte,
+comparaison de sources, clarification de données, explication pour le public,
+question pertinente, document primaire, angle d'analyse ou reportage réel.
+**Recopier ou paraphraser mécaniquement un seul confrère ne suffit pas.**
+
+Les sources apparaissent sous l'article, avec au moins une référence primaire
+pour les annonces majeures quand elle est disponible. Les faits obtenus par
+un média tiers sont attribués à ce média, sans se faire passer pour leur auteur.
+Un article n'est jamais présenté comme un reportage s'il n'y a eu ni déplacement,
+ni entretien, ni observation réelle.
+
+## Circuit d'édition — obligatoire pour toute nouvelle publication
+
+1. Le radar trouve des pistes, pas des faits confirmés.
+2. Le rédacteur sélectionne un sujet ayant une portée réelle.
+3. Les informations sont confrontées aux communications et documents originaux.
+4. Un brouillon avec titre, angle, format, dates, attribution et liens sources est préparé.
+5. **Contrôle éditorial humain substantiel** : la personne responsable vérifie les
+   faits, choisit les formulations et décide d'approuver, corriger ou rejeter.
+6. Publication seulement après cette approbation ; conserver une trace des
+   sources utilisées et de la date de vérification.
+7. Corriger et dater toute modification factuelle significative.
+
+Aucune publication en masse sans approbation. La responsabilité éditoriale
+appartient à une personne ou structure réellement identifiable.
+
 ## Production réaliste
 - Deux recherches automatiques par jour à partir de six recherches thématiques RSS.
 - Maximum cinq **candidats** par passage, regroupés dans une Pull Request GitHub.
