@@ -91,6 +91,15 @@ def draft(item: dict, created: str) -> str:
     title = item["titre"]
     theme = item["Thème"]
     category, fmt, length = CATEGORY.get(theme, ("ACTUALITÉS", "Actualité", "250 à 500 mots"))
+    # La source RSS peut être classée sous le mauvais thème.
+    # Le nom explicite d'un festival prime sur ce classement automatique.
+    title_lc = unicodedata.normalize("NFKD", title.lower())
+    title_lc = "".join(c for c in title_lc if not unicodedata.combining(c))
+    if any(name in title_lc for name in (
+        "festival", "hellfest", "graspop", "rock en seine", "main square",
+        "dour festival", "primavera sound", "sziget", "vieilles charrues"
+    )):
+        category, fmt, length = "FESTIVALS", "Actualité", "250 à 500 mots"
     specific = BY_TOPIC["SOCIÉTÉ" if category == "SOCIÉTÉ" else "FESTIVALS" if category == "FESTIVALS" else "CONCERTS"]
     items = "\n".join(f"- [ ] {v}" for v in VERIFY_COMMON + specific)
     return f"""---
@@ -202,6 +211,8 @@ def self_test():
     article = draft(parsed[0], "2026-10-21")
     assert "[LIEN À AJOUTER" in article and "publication: INTERDITE_AVANT_VALIDATION" in article
     assert "250 à 500 mots" in article
+    festival_item = dict(parsed[0], titre="Graspop Metal Meeting 2027 : un festival annonce sa tête d'affiche")
+    assert "categorie: FESTIVALS" in draft(festival_item, "2026-10-21")
     assert ".." not in slug(parsed[0]["titre"])
     print("Test du préparateur éditorial : OK")
 
