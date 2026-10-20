@@ -7,6 +7,7 @@ on:
       - 'config/sources.json'
       - 'scripts/veille.py'
       - 'scripts/preparer_articles.py'
+      - 'scripts/proposer_publication.py'
       - '.github/workflows/veille.yml'
   schedule:
     - cron: '17 7,18 * * *'
@@ -22,8 +23,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Installer requests
-        run: python -m pip install 'requests>=2.31,<3'
+      - name: Installer les dépendances
+        run: python -m pip install 'requests>=2.31,<3' 'beautifulsoup4>=4.12,<5'
       - name: Vérifier le moteur de veille
         run: python scripts/veille.py --self-test
       - name: Détecter les sujets d'actualité
@@ -47,3 +48,26 @@ jobs:
             vérifications à mener, pas des articles prêts à publier.
             Fusionner pour enregistrer les titres déjà vus et éviter les doublons.
           add-paths: data/
+      - name: Tester le contrôle automatique des articles
+        run: python scripts/proposer_publication.py --self-test
+      - name: Rédiger et recouper une proposition d'article
+        run: python scripts/proposer_publication.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Soumettre l'article validé techniquement pour approbation
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bot/article-a-publier
+          delete-branch: true
+          title: 'BACKSTAGE — article prêt à approuver'
+          commit-message: 'rédaction: proposer un article vérifié et prêt à publier'
+          body: |
+            Proposition d'article mise en forme dans index.html.
+            Les extraits factuels ont été retrouvés sur une page de source primaire.
+            Un contrôle automatique réduit le risque d'erreur, mais n'est pas infaillible.
+            Fusionner = publier l'article. Fermer = rejeter.
+            Les sources restent visibles discrètement sous l'article.
+          add-paths: |
+            index.html
+            redaction/validations/*.md
