@@ -1,43 +1,58 @@
-# BACKSTAGE — ligne éditoriale
+# BACKSTAGE — ligne éditoriale (version 0.3)
 
-## Positionnement
-BACKSTAGE est un **média indépendant dédié aux festivals et à la musique live**.
-Il n'est pas limité géographiquement. Les festivals restent son domaine principal :
-- environ **70 %** de contenus festivals ;
-- environ **20 %** concerts, tournées, annonces de dates ;
-- environ **10 %** découvertes d'artistes, salles, coulisses et culture live.
+## Identité
+BACKSTAGE est un média **d'actualité et de société sur la musique live**.
+Il suit les festivals, les grands concerts, les tournées, les retours et
+reformations d'artistes, la billetterie, les festivals et l'économie du spectacle vivant.
+La couverture privilégie la France et ses pays voisins, sans exclure les événements
+internationaux importants. Aucun « partenariat » ou « média accrédité » sans preuve.
 
-Ces proportions servent à hiérarchiser les sujets, sans quotas mécaniques.
+## Hiérarchie éditoriale
+1. **Breaking news importantes** : reformation d'un groupe marquant, tournée majeure,
+   nouvelles dates en France, programmation d'un grand festival, annulation, changements majeurs.
+2. **Festivals** : affiches confirmées, billetterie, organisation, retours sourcés.
+3. **Live & société** : tarification dynamique, économie, travail, accessibilité, sécurité,
+   environnement, culture des concerts. Les controverses sont exposées loyalement.
+4. **Dossiers et guides** : articles explicatifs et angles de fond.
+5. **Reportages** : uniquement après entretiens ou présence sur le terrain réels.
 
-## Notre promesse au lecteur
-1. Séparer **actualité vérifiée**, **guide pratique** et **point de vue éditorial**.
-2. Relier toute annonce factuelle à une source officielle et une date de vérification.
-3. Ne publier aucune critique, interview, photo de reportage ou récit de coulisses fictifs.
-4. Indiquer clairement les invitations, partenariats, liens d'affiliation et contenus sponsorisés.
-5. Éviter les titres artificiellement sensationnalistes et les contenus IA génériques.
+Le site n'est pas un agenda exhaustif des salles et ne suit pas deux salles arbitraires.
+Aucun quota mécanique. Une grande annonce mondiale vaut davantage que dix micro-brèves.
 
-## Organisation minimale
-- Départ avec **six sites officiels** surveillés : quatre festivals et deux salles.
-- La veille relève les changements. Elle ne peut pas certifier seule une annonce.
-- Un changement détecté donne naissance à une proposition à examiner (GitHub Pull Request), **pas à une publication**.
-- Relecture humaine avant rédaction et publication ; priorité aux informations vraiment utiles.
-- Cible initiale : **1 à 2 bons articles par semaine**, plutôt que des dizaines de brèves automatiques.
-- Chaque article peut ensuite être décliné en un résumé réseaux sociaux *après validation*.
+## Production réaliste
+- Deux recherches automatiques par jour à partir de six recherches thématiques RSS.
+- Maximum cinq **candidats** par passage, regroupés dans une Pull Request GitHub.
+- Les titres et médias détectés servent de **pistes**, jamais de sources suffisantes.
+- Une personne vérifie auprès de l'artiste, du festival, du tourneur ou de la salle.
+- La vérification porte sur les villes, dates, tarifs, lieux, reprogrammations et disponibilité.
+- La rédaction originale peut être assistée par IA, mais ce module n'est pas encore activé.
+- Choisir au plus quelques sujets forts : viser initialement 1 à 3 contenus publiés
+  par semaine, et réagir plus vite en cas d'annonce exceptionnelle.
+- Ne pas automatiser la publication avant relecture humaine.
 
-## Formats
-- Actualité sourcée (annonce de programmation, date de tournée, nouveau concert confirmé)
-- Focus festival (programmation, genres, accès, informations utiles)
-- Concerts & scènes (annonces vérifiées, guide d'une salle ou d'un concert)
-- Découvertes (artistes de première partie, sélection éditoriale)
-- Retour d'expérience **uniquement si une présence réelle est attestée**
+## Confiance et déontologie
+- Ne pas copier les articles d'autres médias ni les photos sous droit.
+- Citer les sources primaires, et attribuer les informations de presse utilisées.
+- Date de publication exacte, correction lorsqu'une annonce évolue.
+- Ne pas inventer interviews, reportages, critiques de concert, statistiques d'audience
+  ou relations avec des organisateurs.
+- Déclarer les invitations, prises en charge, liens affiliés et contenus sponsorisés.
+- Une invitation ou une accréditation n'achète jamais une critique favorable.
+- Avant de démarcher : renseigner une adresse de contact, l'identité éditoriale,
+  les mentions légales applicables et des références éditoriales réelles.
 
-## Relations professionnelles
-Une invitation ne garantit jamais un contenu favorable. Les propositions de collaboration
-doivent refléter des moyens, audiences, références et accès réels. Aucun partenariat existant
-ne doit être supposé. Les sollicitations d'accès doivent préciser les contenus promis et
-respecter les règles de chaque organisateur.
+## Technologie et limites
+- Site statique déployé par GitHub Pages, code dans index.html.
+- Config de veille dans config/sources.json, radar dans scripts/veille.py.
+- RSS Google Actualités : mécanisme d'agrégation non documenté officiellement.
+  Disponibilité et couverture non garanties. Il peut rater une annonce ; compléter par
+  des sources officielles ciblées en cas de grand événement.
+- Les Pull Requests contiennent seulement des **propositions d'angles**. Une fusion
+  marque les liens repérés comme vus. Elle ne publie aucun article.
+- L'IA payante n'est pas nécessaire pour le radar. Jamais de clé en dépôt public.
 
-## Périmètre technique
-Le site public est un site statique publié sur GitHub Pages.
-La veille fonctionne sur GitHub Actions. L'IA de rédaction n'est **pas encore activée**.
-Ne jamais écrire de clé API dans le dépôt public.
+## Prochaines évolutions utiles
+1. Un petit back-office « Approuver / Rejeter » indépendant de GitHub.
+2. Un générateur de brouillons à partir de sources **officiellement confirmées**.
+3. Un système de pages d'articles statiques indexables, avec métadonnées de recherche.
+4. Contact professionnel et transparence légale.
