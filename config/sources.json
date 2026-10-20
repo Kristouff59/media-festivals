@@ -1,0 +1,30 @@
+[
+  {
+    "id": "hellfest",
+    "nom": "Hellfest — actualités",
+    "url": "https://hellfest.fr/news",
+    "selector": "main",
+    "actif": true
+  },
+  {
+    "id": "main-square",
+    "nom": "Main Square — accueil",
+    "url": "https://mainsquarefestival.fr/",
+    "selector": "main",
+    "actif": true
+  },
+  {
+    "id": "rock-en-seine",
+    "nom": "Rock en Seine — accueil",
+    "url": "https://www.rockenseine.com/",
+    "selector": "main",
+    "actif": true
+  },
+  {
+    "id": "dour",
+    "nom": "Dour Festival — accueil",
+    "url": "https://www.dourfestival.eu/",
+    "selector": "main",
+    "actif": true
+  }
+]
