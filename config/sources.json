@@ -8,37 +8,37 @@
       "id": "festivals",
       "nom": "Festivals et programmations",
       "langue": "fr",
-      "requete": "festival musique programmation annonce artistes billetterie when:7d"
+      "requete": "festival programmation artistes when:7d"
     },
     {
       "id": "concerts",
       "nom": "Grandes tournées en France",
       "langue": "fr",
-      "requete": "concert tournée artiste Paris France dates annonce when:7d"
+      "requete": "tournée concert France when:7d"
     },
     {
       "id": "retours",
       "nom": "Reformations et retours sur scène",
       "langue": "fr",
-      "requete": "groupe reforme reformation retour scène tournée concerts when:7d"
+      "requete": "reformation groupe concert when:7d"
     },
     {
       "id": "reunions-internationales",
       "nom": "Band reunions and major comeback tours",
       "langue": "en",
-      "requete": "band reunion comeback tour concerts live when:7d"
+      "requete": "band reunion tour when:7d"
     },
     {
       "id": "societe",
       "nom": "Enjeux de la musique live",
       "langue": "fr",
-      "requete": "concert festival billetterie prix revente annulation sécurité when:7d"
+      "requete": "billetterie concert prix when:7d"
     },
     {
       "id": "voisins",
       "nom": "Grandes annonces dans les pays voisins",
       "langue": "fr",
-      "requete": "festival concert tournée Belgique Suisse Luxembourg Allemagne when:7d"
+      "requete": "festival concert Belgique when:7d"
     }
   ]
 }
