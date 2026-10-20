@@ -55,7 +55,13 @@ def score(headline, topic):
     if annonce: value += 3
     if societe and (concert or festival or topic=="societe"): value += 5
     if any(v in t for v in ("france", "paris", "belgique", "suisse", "luxembourg", "bruxelles", "lyon", "lille", "marseille", "bordeaux", "allemagne")): value += 3
-    if topic in ("retours", "reunions-internationales") and reunion: value += 7
+    if topic in ("retours", "reunions-internationales") and reunion: value += 5
+    # Une reformation à l'étranger mérite un signalement, mais ne doit pas
+    # étouffer les grandes annonces utiles aux lecteurs français.
+    if topic == "reunions-internationales" and not any(v in t for v in ("france", "paris", "belgium", "europe", "european", "uk tour")):
+        value -= 7
+    if topic in ("festivals", "concerts", "voisins") and (festival or concert):
+        value += 4
     if topic == "societe" and societe: value += 4
     if "playlist" in t or "streaming" in t and not (concert or festival): value -= 10
     return value
@@ -96,7 +102,7 @@ def parse_item(item, theme, now):
     return {
         "titre": title, "source_media": publisher or "Média non précisé",
         "lien_decouverte": link, "date_source": date.isoformat(timespec="minutes"),
-        "theme": theme["nom"], "score": relevance, "normalized": normalized, "key": sha(normalized)
+        "theme": theme["nom"], "theme_id": theme["id"], "score": relevance, "normalized": normalized, "key": sha(normalized)
     }
 
 def make_digest(items, day):
@@ -153,7 +159,21 @@ def run():
         if any(SequenceMatcher(None, item["normalized"], prev["normalized"]).ratio() > .82 for prev in unique):
             continue
         unique.append(item)
-    top = unique[:int(config.get("max_articles_par_veille", 7))]
+    # Diversifier une courte revue de presse : une rubrique n'occupe pas à elle
+    # seule la totalité des propositions, sauf en l'absence d'autres sujets.
+    limit = int(config.get("max_articles_par_veille", 5))
+    order = ("concerts", "festivals", "societe", "voisins", "retours", "reunions-internationales")
+    top, used = [], set()
+    for theme_id in order:
+        candidate = next((x for x in unique if x["theme_id"] == theme_id and x["key"] not in used), None)
+        if candidate and len(top) < limit:
+            top.append(candidate)
+            used.add(candidate["key"])
+    for candidate in unique:
+        if len(top) >= limit: break
+        if candidate["key"] not in used:
+            top.append(candidate)
+            used.add(candidate["key"])
     if top:
         CANDIDATES.mkdir(parents=True, exist_ok=True)
         filename = CANDIDATES / (now.strftime("%Y-%m-%d") + ".md")
