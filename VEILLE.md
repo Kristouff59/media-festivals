@@ -1,19 +1,44 @@
-# BACKSTAGE — veille gratuite (version 0.2)
+# BACKSTAGE — Radar d'actualité musique live
 
-Le site public reste servi par GitHub Pages depuis la branche main.
-La veille quotidienne prépare uniquement des propositions dans une Pull Request GitHub.
-Elle n'écrit pas sur le site et n'envoie aucun email.
+## Objectif
+Repérer de grands sujets d'actualité : concerts, tournées, reformations, festivals
+et sujets de société. **Ce n'est pas un agenda de salles.**
 
-## Activation
+La veille utilise six recherches RSS thématiques, dont une en anglais pour
+détecter les grands retours de groupes internationaux.
+Les flux Google Actualités ne constituent ni une source officielle ni une API
+garantie. On les utilise uniquement pour la **découverte de sujets**.
 
-1. Ouvrir Settings → Actions → General → Workflow permissions.
-2. Activer Read and write permissions, et Allow GitHub Actions to create and approve pull requests.
-3. Ouvrir Actions → BACKSTAGE — veille officielle → Run workflow.
-4. Le premier passage établit seulement une référence des pages officielles.
-5. Dans Pull requests, relire et fusionner la proposition de référence.
-6. Les exécutions suivantes peuvent créer des brouillons dans data/review_queue pour vérification.
+## Automatisation sans API payante
+- Deux exécutions quotidiennes via GitHub Actions (heures UTC).
+- Maximum **5 sujets proposés par passage** afin de limiter la charge.
+- Les doublons de titres sont supprimés.
+- Seuls des titres et liens de découverte sont conservés, jamais le texte
+  complet d'articles externes.
+- Les propositions sont consignées dans `data/candidats/`.
+- Une seule Pull Request récurrente, si de nouveaux candidats existent.
+- Aucun article n'est publié automatiquement. Un événement important peut
+  encore être manqué ou détecté avec retard.
 
-Le workflow s'exécute environ une fois par jour via GitHub Actions ; l'horaire effectif peut varier.
-Il peut échouer si un site bloque l'extraction automatique, et ces cas ne valent pas annonces.
-Il ne consomme pas d'API d'IA payante. La rédaction assistée par IA et l'intégration des articles
-dans le site seront mises en place ensuite. Ne publier aucune annonce sans vérifier sa source.
+## Vérifier une Pull Request
+1. Ouvrir `Pull requests` → `BACKSTAGE — nouvelles pistes éditoriales à vérifier`.
+2. Ouvrir `Files changed` et lire la liste de candidats.
+3. Conserver uniquement les sujets vraiment importants.
+4. **Confirmer chaque information directement auprès de l'artiste, du festival,
+   du tourneur ou de l'organisateur**, y compris les dates et les changements.
+5. Préparer un article original puis relire avant publication.
+6. Fusionner la PR pour mémoriser les sujets déjà vus (la fusion ne publie rien
+   sur le magazine).
+
+## À savoir
+- `data/source_state.json` vient de l'ancienne surveillance de pages ;
+  il n'est plus utilisé par le nouveau radar.
+- Le moteur ne génère pas encore de véritables brouillons IA ; prochaine étape.
+- Aucun accès premium, compte Google News ou clé API ne sont requis.
+- Si les flux RSS deviennent indisponibles, l'exécution sera signalée en échec.
+- Le site GitHub Pages est totalement distinct de ces candidats : il ne présente
+  que des articles intégrés au code du site après vérification.
+
+## Test
+GitHub → Actions → `BACKSTAGE — radar musique live` → Run workflow (nouvelle exécution).
+Les logs affichent les titres inspectés et le nombre de propositions.
