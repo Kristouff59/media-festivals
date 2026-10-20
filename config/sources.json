@@ -2,7 +2,7 @@
   "version": 2,
   "commentaire": "Veille thématique pour trouver les annonces importantes de musique live, et non des agendas de salles choisies arbitrairement. Flux de découverte non assimilables à une vérification officielle.",
   "edition": "France et pays voisins, avec actualités internationales importantes",
-  "max_articles_par_veille": 7,
+  "max_articles_par_veille": 5,
   "themes": [
     {
       "id": "festivals",
