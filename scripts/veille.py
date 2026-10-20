@@ -46,7 +46,11 @@ def score(headline, topic):
     t = plain(headline)
     festival = any(v in t for v in ("festival", "hellfest", "rock en seine", "main square", "dour ", "primavera", "sziget", "vieilles charrues", "francofolies"))
     concert = any(v in t for v in ("concert", "tournee", "tour ", " tournée", "live ", "sur scene", "stade de france", "accor arena", "olympia", "arena ", "festiv"))
-    reunion = any(v in t for v in ("reform", "reunion", "reunite", "comeback", "retour sur scene", "return to the stage", "reunites"))
+    reunion = any(v in t for v in ("reformation", "se reforme", "groupe reforme",
+                                   "band reunion", "band reunites", "bands reunite",
+                                   "comeback", "retour sur scene", "return to the stage"))
+    if "temple reforme" in t or "eglise reformee" in t or "culte reforme" in t:
+        reunion = False
     annonce = any(v in t for v in ("annonce", "devoile", "confirme", "programmation", "affiche", "dates", "billet", "billetterie", "sold out", "complet", "line-up", "lineup"))
     societe = any(v in t for v in ("prix", "tarif", "revente", "arnaque", "annul", "securit", "accessibil", "pollution", "travail", "billetterie", "ticket", "econom"))
     if not (festival or concert or reunion or (societe and topic=="societe")):
@@ -69,8 +73,8 @@ def score(headline, topic):
     musical = any(v in t for v in ("musique", "concert", "artiste", "line-up", "lineup",
                                       "rock", "jazz", "rap", "metal", "electro", "dj ", "chanson",
                                       "groupe", "chanteur", "chanteuse", "tournee"))
-    if topic == "festivals" and not musical:
-        value -= 16
+    if festival and not musical:
+        value -= 20
     # Notre rubrique concerts ne doit pas devenir l'agenda de petits concerts locaux.
     if topic == "concerts" and not (annonce or reunion or "tournee" in t or
        any(v in t for v in ("paris", "france", "bruxelles", "belgique",
