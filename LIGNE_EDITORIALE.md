@@ -61,6 +61,18 @@ ni entretien, ni observation réelle.
 Aucune publication en masse sans approbation. La responsabilité éditoriale
 appartient à une personne ou structure réellement identifiable.
 
+## Voix et sensibilité de BACKSTAGE
+
+- **Rock comme culture de référence**, sans exclure la pop, le rap, le metal, l'électronique, le jazz ou les musiques du monde si l'actualité est forte.
+- **Un journaliste qui aime réellement le live** : phrases naturelles, du relief, une sensation de scène ou de public seulement lorsqu'elle est étayée, de la curiosité, un angle singulier.
+- **Une sensibilité sociale et humaniste, jamais partisane** : accessibilité des concerts, prix des billets, publics, artistes et équipes techniques, conditions de travail, environnement. Expliquer loyalement les désaccords plutôt que dicter une opinion politique.
+- **Pas de voix administrative ni de communiqué réécrit** : éviter les enchaînements « selon X », les introductions stéréotypées, les superlatifs creux, les généralités de remplissage.
+- **Sources discrètes en bas d'article** : liens primaires et attribution des contributions originales, mais ni placards ni citations répétées à chaque paragraphe.
+- **Pas de fiction journalistique** : jamais d'ambiance vécue, de citation, d'entretien ou de reportage prétendument réalisé.
+- Un petit fait mérite une brève vive. Une grande annonce mérite un contexte, parfois un dossier. Le lecteur doit apprendre quelque chose, sans longueur artificielle.
+- Les textes générés et leurs faits sont contrôlés par des mécanismes indépendants avant la proposition à publier ; en cas de doute ou de source indisponible, ne rien proposer à publier.
+- L'éditeur n'a qu'une décision finale à prendre : **fusionner la proposition prête à publier** ou la fermer. La vérification technique et documentaire ne doit pas lui être déléguée.
+
 ## Production réaliste
 - Deux recherches automatiques par jour à partir de six recherches thématiques RSS.
 - Maximum cinq **candidats** par passage, regroupés dans une Pull Request GitHub.
