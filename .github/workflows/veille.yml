@@ -31,6 +31,4 @@ jobs:
             Les pages sources peuvent changer sans annoncer une nouveauté.
             Vérifier chaque extrait directement sur son lien officiel AVANT de fusionner.
             Aucun article ni message sur un réseau social n'est publié automatiquement.
-          add-paths: |
-            data/source_state.json
-            data/review_queue/*.json
+          add-paths: data/
