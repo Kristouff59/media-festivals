@@ -1,0 +1,47 @@
+name: BACKSTAGE — validation du site
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '.github/workflows/validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier la syntaxe JavaScript du site
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html','utf8');
+          const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+          if (scripts.length < 2) throw new Error('Scripts du site absents');
+          fs.writeFileSync('/tmp/backstage-scripts.js', scripts.join('\n'));
+          console.log('Scripts extraits :',scripts.length);
+          NODE
+          node --check /tmp/backstage-scripts.js
+      - name: Contrôler les liens éditoriaux et les catégories
+        run: |
+          python - <<'PY'
+          import json,re
+          from pathlib import Path
+          h=Path('index.html').read_text(encoding='utf8')
+          m=re.search(r'window\.BACKSTAGE_CONTENT = (\{.*?\});</script>',h)
+          assert m, 'Données des articles absentes'
+          db=json.loads(m.group(1))
+          assert len(db['articles']) >= 3
+          for a in db['articles']:
+              if a.get('format') in ('ACTUALITÉ','DÉCRYPTAGE'):
+                  assert a.get('sources'), f"Sources manquantes : {a['slug']}"
+              for s in a.get('sources',[]):
+                  assert s['url'].startswith('https://'), 'Lien source non sécurisé'
+          assert 'function dossiersPage()' in h
+          assert 'function societePage()' in h
+          print('Articles et catégories validés')
+          PY
