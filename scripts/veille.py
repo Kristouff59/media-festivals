@@ -167,8 +167,9 @@ def run():
     # Empêcher l'augmentation sans limite de l'historique.
     cutoff = now - timedelta(days=35)
     seen = {k: v for k, v in seen.items() if datetime.fromisoformat(v) >= cutoff}
-    STATE.parent.mkdir(parents=True, exist_ok=True)
-    STATE.write_text(json.dumps({"seen": seen, "last_success_utc": now.isoformat(), "feeds_ok": fetched}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if unique:
+        STATE.parent.mkdir(parents=True, exist_ok=True)
+        STATE.write_text(json.dumps({"seen": seen}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print("À vérifier : " + str(len(top)) + " sujet(s). Aucun article publié.")
 
 def self_test():
