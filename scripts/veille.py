@@ -64,6 +64,18 @@ def score(headline, topic):
         value += 4
     if topic == "societe" and societe: value += 4
     if "playlist" in t or "streaming" in t and not (concert or festival): value -= 10
+    # Un festival peut aussi concerner la BD, le cinéma ou la gastronomie :
+    # imposer des indices musicaux avant de proposer une telle actualité.
+    musical = any(v in t for v in ("musique", "concert", "artiste", "line-up", "lineup",
+                                      "rock", "jazz", "rap", "metal", "electro", "dj ", "chanson",
+                                      "groupe", "chanteur", "chanteuse", "tournee"))
+    if topic == "festivals" and not musical:
+        value -= 16
+    # Notre rubrique concerts ne doit pas devenir l'agenda de petits concerts locaux.
+    if topic == "concerts" and not (annonce or reunion or "tournee" in t or
+       any(v in t for v in ("paris", "france", "bruxelles", "belgique",
+                            "stade", "arena", "zenith", "mondiale", "europeenne"))):
+        value -= 10
     return value
 
 def rss_url(q, lang):
