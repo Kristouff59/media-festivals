@@ -1,65 +1,70 @@
-# BACKSTAGE — fonctionnement de la rédaction automatique
+# BACKSTAGE — publier des articles assistés avec OpenAI
 
-## Objectif
-L'équipe n'a qu'une décision de publication à prendre :
-**valider une Pull Request pour publier**, ou **la fermer pour rejeter**.
+## Fonctionnement
+Le radar gratuit détecte les nouvelles musicales deux fois par jour.
+L'API OpenAI peut préparer un article, rechercher une annonce officielle et
+vérifier la présence d'au moins trois passages textuels sur cette page.
+Si elle ne dispose pas de preuves suffisantes, rien n'est proposé.
+Si un article passe les contrôles, GitHub ouvre une Pull Request intitulée
+**BACKSTAGE — article prêt à approuver**.
 
-Le radar (gratuit) fonctionne déjà deux fois par jour. La rédaction complète
-requiert une seule configuration supplémentaire : une clé d'API Gemini,
-conservée dans un secret GitHub. La clé n'est jamais écrite dans le code public.
+**Aucune publication automatique :** vous cliquez sur Merge pull request
+pour publier sur GitHub Pages, ou sur Close pull request pour rejeter.
+Cela implique toujours une responsabilité éditoriale humaine.
 
-## Activer une fois, sans facturation souhaitée
-1. Aller dans [Google AI Studio — clés API](https://aistudio.google.com/api-keys).
-2. Créer une clé pour un **projet au niveau gratuit**, en évitant d'activer la
-   facturation ou de rattacher un projet payant.
-3. Copier la clé **uniquement** dans
-   [GitHub → Settings → Secrets and variables → Actions](https://github.com/Kristouff59/media-festivals/settings/secrets/actions).
-4. Cliquer sur **New repository secret**.
-5. Nom exact : `GEMINI_API_KEY` ; valeur : ta clé privée ; puis **Add secret**.
-6. Sur [Actions → BACKSTAGE — radar musique live](https://github.com/Kristouff59/media-festivals/actions/workflows/veille.yml),
-   faire **Run workflow** une seule fois pour tester.
+## Activer l'API OpenAI une seule fois
 
-**Ne jamais coller la clé dans une conversation, un ticket, un fichier, une PR
-ou sur le site public.** Vérifier régulièrement le quota et le projet utilisé.
-Gemini propose des quotas sans frais en France, mais leurs niveaux et conditions
-peuvent changer. Le modèle choisi est `gemini-2.5-flash` avec recherche Google.
+1. Ouvrir https://platform.openai.com/api-keys et se connecter.
+2. De préférence, créer un projet API distinct nommé BACKSTAGE.
+3. Créer une clé API dans ce projet.
+4. Ouvrir https://github.com/Kristouff59/media-festivals/settings/secrets/actions
+5. Cliquer New repository secret.
+6. Nom : `OPENAI_API_KEY`
+7. Valeur : votre clé privée OpenAI ; confirmer avec Add secret.
+8. Revenir dans https://github.com/Kristouff59/media-festivals/actions/workflows/veille.yml
+   puis cliquer Run workflow pour vérifier le fonctionnement.
 
-## Comment fonctionne la vérification automatique
-1. Le radar propose au maximum cinq pistes thématiques.
-2. L'outil en examine au plus trois.
-3. Le moteur recherche sur le Web une **source primaire** : site officiel
-   d'artiste, d'organisateur ou d'institution (et non un article de presse).
-4. Il exige plusieurs extraits factuels, puis ouvre la page officielle et
-   cherche **au moins trois extraits exactement présents** sur la page.
-5. Si l'étape échoue, ce sujet est abandonné sans publication.
-6. Le moteur rédige un article original, plus humain et plus incarné, fondé
-   uniquement sur les éléments corroborés.
-7. Il refuse les années absentes de la source, les articles trop courts,
-   les contenus sans sources et les publications en doublon.
-8. Si tout passe, il prépare une **PR `bot/article-a-publier`** qui modifie
-   directement `index.html`. L'article n'est pas encore en ligne.
-9. Le responsable ouvre cette PR et clique **Merge pull request** pour publier,
-   ou **Close pull request** pour rejeter. La fusion déclenche le déploiement du site.
+**Ne jamais insérer la clé API dans un fichier du dépôt public, dans le site
+ni dans une conversation.** Les secrets GitHub sont transmis seulement à
+l'exécution du workflow sur GitHub Actions.
 
-**Limite essentielle :** aucun logiciel n'assure à lui seul une exactitude
-journalistique absolue. Ces contrôles sont stricts et peuvent refuser beaucoup
-de sujets ; ils réduisent les erreurs, sans les rendre impossibles.
-La décision finale de publier reste une responsabilité éditoriale réelle.
+## Facturation — point important
+L'abonnement ChatGPT Plus ne comprend pas l'utilisation de l'API OpenAI.
+Vous devrez disposer d'un compte API facturable ou de crédits disponibles.
 
-## Ligne éditoriale de rédaction
-- Une voix humaine, expressive, rythmée, pas un communiqué recopié.
-- Dominante rock, sans exclure la pop, le rap, le jazz et l'électronique.
-- Sensibilité sociale (accès à la musique, billet, travail, solidarité)
-  sans slogans politiques.
-- Les sources sont discrètement accessibles sous l'article ; ni encyclopédie
-  bureaucratique ni attribution absente.
-- Aucune citation ou ambiance de concert inventée.
-- Brèves courtes pour petites nouvelles, articles plus développés quand
-  plusieurs faits solides permettent une analyse réelle.
+Le modèle configuré est `gpt-5.4-mini` avec OpenAI Responses API.
+La recherche Web utilise l'outil officiel `web_search`.
+La facturation tient compte des tokens et des recherches Web.
 
-## En cas de panne ou sans clé
-Le radar continue de fonctionner. Le système ne rédige simplement pas
-d'article complet et ne crée pas de nouvelle PR de publication.
+Les appels sont limités à **deux candidats maximum par passage du radar** ;
+chaque candidat peut utiliser une recherche Web et, en cas de source suffisamment
+corroborée, un appel supplémentaire de rédaction. Tant qu'une proposition de
+publication est ouverte, l'automatisation s'abstient de proposer un nouvel article.
 
-Les PR de radar `bot/radar-musique-live` sont des fiches de travail,
-**pas des publications** : elles peuvent être ignorées pendant les essais.
+Réglez un plafond de dépenses et les alertes appropriées dans
+https://platform.openai.com/settings/organization/limits
+et suivez l'utilisation sur https://platform.openai.com/usage.
+Les alertes et budgets souples ne constituent pas nécessairement des limites
+de dépenses bloquantes ; vérifier les contrôles disponibles sur le compte.
+L'absence de clé signifie zéro appel API.
+
+## Exigence journalistique
+- Rock comme culture de référence ; ouverture à tous les genres.
+- Un article sensible, humain et vivant, sans langue administrative.
+- Une curiosité pour les réalités sociales de la musique live, non partisane.
+- Informations primaires confirmées et citations discrètes sous l'article.
+- Pas de reportage inventé, pas de copie d'article tiers.
+- Brève courte quand les faits sont rares ; format long quand c'est justifié.
+- Les vérifications automatiques réduisent les erreurs, sans les éliminer.
+- Une source inaccessible, une mauvaise correspondance ou un doute
+  significatif entraîne l'abandon de la proposition.
+- Aucun média ne peut garantir la publication de toutes les annonces importantes.
+
+## Dépannage
+- Un workflow vert avec zéro article n'est pas nécessairement un problème :
+  l'actualité peut manquer de sources officielles corroborables.
+- `OPENAI_API_KEY` absent : le radar fonctionne mais la rédaction n'est pas activée.
+- HTTP 401 : clé invalide ; HTTP 429 : limite / crédit API possiblement épuisé.
+- Le journal GitHub ne doit jamais afficher la valeur de la clé.
+- Chaque nouvelle proposition de publication est une Pull Request distincte
+  du radar `bot/radar-musique-live` ; la fusion des fiches de veille ne publie rien.
