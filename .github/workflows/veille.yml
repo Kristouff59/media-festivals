@@ -53,7 +53,7 @@ jobs:
       - name: Rédiger et recouper une proposition d'article
         run: python scripts/proposer_publication.py
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Contrôler la syntaxe du magazine après rédaction
         shell: bash
