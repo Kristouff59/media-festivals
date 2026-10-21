@@ -59,8 +59,16 @@ def call(key,prompt,search=False):
         json=payload,timeout=120
     )
     if not response.ok:
-        raise ValueError("API OpenAI : HTTP "+str(response.status_code)+
-                         " (contrôler le crédit, le quota et le modèle)")
+        try:
+            error=response.json().get("error",{})
+            message=str(error.get("message","")).replace("\n"," ")[:280]
+            param=str(error.get("param") or "")[:90]
+        except (ValueError,TypeError,AttributeError):
+            message="Réponse d'erreur non décodable"
+            param=""
+        # Erreur technique globale : ne pas la confondre avec un article non confirmé.
+        raise RuntimeError("Erreur API OpenAI HTTP "+str(response.status_code)+
+                           " ; paramètre="+param+" ; motif="+message)
     data=response.json()
     if search and not any(x.get("type")=="web_search_call" for x in data.get("output",[])):
         raise ValueError("Recherche Web non attestée dans la réponse")
