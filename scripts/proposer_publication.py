@@ -112,9 +112,11 @@ def find_known_official(title):
     # sans que ce dernier figure encore dans le catalogue.
     for a in db.get("articles",[]):
         if a.get("category")!="FESTIVALS":continue
-        title_tokens=set(norm(a.get("title","")).split())
-        shared=title_tokens.intersection(norm(title).split())
-        if len(shared)<3:continue
+        # N'utiliser que le nom explicite du festival, pas des mots communs
+        # (« Angèle », « programmation », « 2027 ») qui fausseraient l'association.
+        prefix=re.split(r"\b20[2-9][0-9]\b",a.get("title",""),1)[0]
+        prefix=norm(prefix.strip(" :–-"))
+        if len(prefix)<7 or prefix not in term:continue
         for source in a.get("sources",[]):
             url=source.get("url","")
             if official(url):
@@ -147,6 +149,9 @@ def fetch_verified_official(url,topic):
     if len(normalized)<250:raise ValueError("Site officiel insuffisamment documenté")
     years=re.findall(r"\b20[2-9][0-9]\b",topic)
     year=years[0] if years else None
+    if not year:
+        heading=re.search(r"(?:programmation|line[ -]?up)\s*(20[2-9][0-9])",clean,re.I)
+        year=heading.group(1) if heading else None
     if year and year not in normalized:
         raise ValueError("L'édition "+year+" n'apparaît pas sur la source officielle")
     excerpt=official_excerpt(clean,year)
@@ -172,14 +177,31 @@ def update_festival(db,festival,official_url,source_text,edition_text):
         label=day.get("day")
         artists=day.get("artists",[])
         if not isinstance(label,str) or not isinstance(artists,list):continue
-        if not norm(label) in edition_text:continue
-        valid=[a for a in artists if isinstance(a,str) and 2<len(a)<90 and norm(a) in edition_text]
+        label_norm=norm(label)
+        # « Vendredi 4 juin » et « VENDREDI 4 » désignent le même jour.
+        header=re.match(r"(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+\d{1,2}",label_norm)
+        needle=header.group(0) if header else label_norm
+        start=edition_text.find(needle)
+        if start<0:continue
+        remainder=edition_text[start+len(needle):]
+        next_day=re.search(r"\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+\d{1,2}\b",remainder)
+        day_section=needle+(remainder[:next_day.start()] if next_day else remainder)
+        valid=[a for a in artists if isinstance(a,str) and 2<len(a)<90 and norm(a) in day_section]
         if valid:proven.append({"day":label,"artists":valid[:18]})
     if sum(len(day["artists"]) for day in proven)<2:return False
+    dates=festival.get("dates","")
+    if not isinstance(dates,str) or len(dates)>75:
+        dates=""
+    if dates:
+        # La date affichée ne peut contenir de mois/année absents de la source.
+        for token in norm(dates).split():
+            if len(token)>=4 and token not in source_text.split():
+                dates=""
+                break
     country=festival.get("country") if festival.get("country") in ("France","Belgique","Suisse","Allemagne","Luxembourg","Espagne","Pays-Bas","Royaume-Uni","Hongrie") else "France"
     city=festival.get("city") if isinstance(festival.get("city"),str) and len(festival["city"])<90 else "À confirmer"
     row={"name":name,"city":city,"country":country,"genres":"Rock / Pop / Électro",
-         "url":official_url,"code":"FEST","dates":festival.get("dates",""),
+         "url":official_url,"code":"FEST","dates":dates,
          "editionYear":year,"lineupStatus":"Premiers noms officiellement confirmés",
          "lineup":proven}
     old=next((i for i,x in enumerate(db["festivals"]) if norm(x["name"])==norm(name)),None)
