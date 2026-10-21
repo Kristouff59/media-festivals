@@ -164,7 +164,6 @@ def fallback_openai(now, themes):
         "tools": [{"type": "web_search", "search_context_size": "medium"}],
         "tool_choice": "required",
         "max_tool_calls": 1,
-        "text": {"format": {"type": "json_object"}},
     }
     response = CLIENT.post(
         "https://api.openai.com/v1/responses",
@@ -191,7 +190,7 @@ def fallback_openai(now, themes):
         for part in item.get("content", []) if part.get("type") == "output_text"
     )
     try:
-        parsed = json.loads(raw)
+        parsed = json.loads(raw.strip().strip(chr(96)).removeprefix("json").strip())
     except (ValueError, TypeError):
         raise ValueError("OpenAI n'a pas renvoyé de JSON exploitable")
     if not isinstance(parsed, dict) or not isinstance(parsed.get("articles"), list):
