@@ -50,6 +50,9 @@ def call(key,prompt,search=False):
         "text":{"format":{"type":"json_object"}}
     }
     if search:
+        # La recherche Web d'OpenAI n'est pas compatible avec JSON mode.
+        # Demander du JSON dans le prompt et l'analyser après réponse.
+        payload.pop("text",None)
         payload["tools"]=[{"type":"web_search","search_context_size":"medium"}]
         payload["tool_choice"]="required"
         payload["max_tool_calls"]=1
@@ -72,7 +75,7 @@ def call(key,prompt,search=False):
     data=response.json()
     if search and not any(x.get("type")=="web_search_call" for x in data.get("output",[])):
         raise ValueError("Recherche Web non attestée dans la réponse")
-    result=json.loads(extract_response_text(data))
+    result=json.loads(extract_response_text(data).strip().strip(chr(96)).removeprefix("json").strip())
     if not isinstance(result,dict):
         raise ValueError("Objet JSON attendu")
     return result
