@@ -100,7 +100,7 @@ def proof(item):
 def find_known_official(title):
     """Un festival déjà traité n'a pas à être redécouvert par recherche Web."""
     raw=SITE.read_text(encoding="utf-8")
-    match=re.search(r"window\\.BACKSTAGE_CONTENT = (\\{.*?\\});</script>",raw,re.S)
+    match=re.search(r"window\.BACKSTAGE_CONTENT = (\{.*?\});</script>",raw,re.S)
     if not match:return None
     db=json.loads(match.group(1))
     term=norm(title)
@@ -124,11 +124,11 @@ def find_known_official(title):
 def official_excerpt(raw,year):
     """Isoler la programmation de l'édition visée des archives précédentes."""
     if not year:return ""
-    pattern=r"(?:programmation|line[ -]?up)\\s*"+str(year)
+    pattern=r"(?:programmation|line[ -]?up)\s*"+str(year)
     match=re.search(pattern,raw,re.I)
     if not match:return ""
     tail=raw[match.start():]
-    next_year=re.search(r"(?:programmation|line[ -]?up|we love green)\\s*20(?:2[0-9])",tail[40:],re.I)
+    next_year=re.search(r"(?:programmation|line[ -]?up|we love green)\s*20(?:2[0-9])",tail[40:],re.I)
     if next_year:
         tail=tail[:40+next_year.start()]
     return tail[:5500]
@@ -141,11 +141,11 @@ def fetch_verified_official(url,topic):
     if len(response.content)>1100000:raise ValueError("Source trop volumineuse")
     soup=BeautifulSoup(response.text,"html.parser")
     for node in soup.select("script,style,noscript,nav,footer"):node.decompose()
-    lines=[re.sub(r"\\s+"," ",v).strip() for v in soup.stripped_strings]
-    clean="\\n".join(v for v in lines if v)
+    lines=[re.sub(r"\s+"," ",v).strip() for v in soup.stripped_strings]
+    clean="\n".join(v for v in lines if v)
     normalized=norm(clean)
     if len(normalized)<250:raise ValueError("Site officiel insuffisamment documenté")
-    years=re.findall(r"\\b20[2-9][0-9]\\b",topic)
+    years=re.findall(r"\b20[2-9][0-9]\b",topic)
     year=years[0] if years else None
     if year and year not in normalized:
         raise ValueError("L'édition "+year+" n'apparaît pas sur la source officielle")
@@ -274,12 +274,12 @@ Ne fabrique aucune citation.""" ,True)
                 response=S.get(url,timeout=15)
                 soup=BeautifulSoup(response.text,"html.parser")
                 for node in soup.select("script,style,noscript,nav,footer"):node.decompose()
-                clean="\\n".join(soup.stripped_strings)
+                clean="\n".join(soup.stripped_strings)
                 yearmatch=re.search(r"20[2-9][0-9]",item["titre"])
                 edition_text=norm(official_excerpt(clean,yearmatch.group() if yearmatch else None))
             except requests.RequestException:
                 edition_text=""
-    fact_list="\\n".join(quotes)[:4800]
+    fact_list="\n".join(quotes)[:4800]
     prompt="""Tu es un journaliste passionné de musique live. BACKSTAGE privilégie
 rock et scènes alternatives, sans exclure pop, électro ou rap. Ton humain,
 sensible, précis, avec du rythme et une curiosité pour l'accès à la culture.
