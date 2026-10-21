@@ -35,21 +35,10 @@ jobs:
         run: python scripts/preparer_articles.py --self-test
       - name: Préparer les fiches d'articles non publiées
         run: python scripts/preparer_articles.py
-      - name: Proposer la sélection à relire
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: bot/radar-musique-live
-          delete-branch: true
-          title: 'BACKSTAGE — nouvelles pistes éditoriales à vérifier'
-          commit-message: 'radar: préparer des sujets musique live à vérifier'
-          body: |
-            Ce dossier contient des sujets repérés par des flux d'agrégation.
-            Ces titres ne sont PAS des faits vérifiés : vérifier les sources primaires.
-            Ne pas reprendre le texte des médias. Aucune publication automatique.
-            Les fiches proposées dans data/brouillons contiennent des plans et des
-            vérifications à mener, pas des articles prêts à publier.
-            Fusionner pour enregistrer les titres déjà vus et éviter les doublons.
-          add-paths: data/
+      - name: Sauvegarder les candidats pour la rédaction
+        run: |
+          mkdir -p /tmp/backstage-radar-data
+          cp -a data/. /tmp/backstage-radar-data/
       - name: Tester le contrôle automatique des articles
         run: python scripts/proposer_publication.py --self-test
       - name: Rédiger et recouper une proposition d'article
@@ -84,3 +73,22 @@ jobs:
           add-paths: |
             index.html
             redaction/validations/*.md
+      - name: Restaurer les fichiers de veille après la proposition d'article
+        run: |
+          mkdir -p data
+          cp -a /tmp/backstage-radar-data/. data/
+      - name: Proposer la sélection à relire
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: bot/radar-musique-live
+          delete-branch: true
+          title: 'BACKSTAGE — nouvelles pistes éditoriales à vérifier'
+          commit-message: 'radar: préparer des sujets musique live à vérifier'
+          body: |
+            Ce dossier contient des sujets repérés par des flux d'agrégation.
+            Ces titres ne sont PAS des faits vérifiés : vérifier les sources primaires.
+            Ne pas reprendre le texte des médias. Aucune publication automatique.
+            Les fiches proposées dans data/brouillons contiennent des plans et des
+            vérifications à mener, pas des articles prêts à publier.
+            Fusionner pour enregistrer les titres déjà vus et éviter les doublons.
+          add-paths: data/
