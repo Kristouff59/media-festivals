@@ -29,6 +29,8 @@ jobs:
         run: python scripts/veille.py --self-test
       - name: Détecter les sujets d'actualité
         run: python scripts/veille.py
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       - name: Vérifier le préparateur éditorial
         run: python scripts/preparer_articles.py --self-test
       - name: Préparer les fiches d'articles non publiées
