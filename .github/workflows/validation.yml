@@ -5,6 +5,12 @@ on:
     paths:
       - 'index.html'
       - '.github/workflows/validation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'redaction/validations/**'
+      - '.github/workflows/validation.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -43,5 +49,16 @@ jobs:
                   assert s['url'].startswith('https://'), 'Lien source non sécurisé'
           assert 'function dossiersPage()' in h
           assert 'function societePage()' in h
+          slugs = [a['slug'] for a in db['articles']]
+          assert len(set(slugs)) == len(slugs), 'Doublon de slug'
+          for festival in db.get('festivals', []):
+              lineup = festival.get('lineup', [])
+              assert isinstance(lineup, list), 'Programmation invalide'
+              if lineup:
+                  assert festival.get('editionYear'), 'Année manquante'
+                  for day in lineup:
+                      assert day.get('day') and isinstance(day.get('artists'), list)
+                      assert all(isinstance(x, str) and len(x)>1 for x in day['artists'])
+          print('Programmation et liens vérifiés')
           print('Articles et catégories validés')
           PY
