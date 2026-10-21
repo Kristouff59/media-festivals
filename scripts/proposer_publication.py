@@ -10,7 +10,8 @@ from preparer_articles import parse_digest
 
 ROOT=Path(__file__).resolve().parent.parent
 SITE=ROOT/"index.html"
-API="https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+API="https://api.openai.com/v1/responses"
+MODEL="gpt-5.4-mini"
 S=requests.Session()
 S.headers.update({"User-Agent":"BACKSTAGE-verification/1.0"})
 BLACKLIST=("news.google.com","google.com","lemonde.fr","infoconcert.com","ouest-france.fr","wikipedia.org","ticketmaster.fr","fnacspectacles.com","localhost","example.com")
@@ -22,19 +23,52 @@ def official(url):
         p=urlparse(url);host=(p.hostname or "").lower()
         return p.scheme=="https" and "." in host and not host.startswith(("127.","10.","192.168.","169.254.","172.16.")) and not any(host==b or host.endswith("."+b) for b in BLACKLIST)
     except (TypeError,ValueError):return False
+def extract_response_text(data):
+    # Responses API: on ignore les appels d'outils, on lit seulement le message final.
+    if data.get("status") not in ("completed", None):
+        raise ValueError("Réponse OpenAI incomplète")
+    parts=[]
+    for output in data.get("output",[]):
+        if output.get("type")!="message":
+            continue
+        for part in output.get("content",[]):
+            if part.get("type")=="output_text":
+                parts.append(part.get("text",""))
+    text="".join(parts).strip()
+    if not text:
+        raise ValueError("Réponse éditoriale vide")
+    return text
+
 def call(key,prompt,search=False):
-    config={"temperature":0.2 if search else 0.7,"maxOutputTokens":5000}
-    if not search:config["responseMimeType"]="application/json"
-    payload={"contents":[{"parts":[{"text":prompt}]}],"generationConfig":config}
-    if search:payload["tools"]=[{"google_search":{}}]
-    r=S.post(API,params={"key":key},json=payload,timeout=100)
-    if not r.ok:raise ValueError("API Gemini HTTP "+str(r.status_code))
-    c=r.json()["candidates"][0]
-    if search and not c.get("groundingMetadata",{}).get("webSearchQueries"):
-        raise ValueError("Recherche Web non attestée")
-    t="".join(x.get("text","") for x in c["content"]["parts"]).strip()
-    t=t.strip(chr(96)).removeprefix("json").strip()
-    return json.loads(t)
+    # Un appel de recherche maximum, pour borner la dépense.
+    payload={
+        "model":MODEL,
+        "input":prompt,
+        "store":False,
+        "max_output_tokens":3800 if search else 4900,
+        "reasoning":{"effort":"low"},
+        "text":{"format":{"type":"json_object"}}
+    }
+    if search:
+        payload["tools"]=[{"type":"web_search","search_context_size":"medium"}]
+        payload["tool_choice"]="required"
+        payload["max_tool_calls"]=1
+    response=S.post(
+        API,headers={"Authorization":"Bearer "+key,
+                     "Content-Type":"application/json"},
+        json=payload,timeout=120
+    )
+    if not response.ok:
+        raise ValueError("API OpenAI : HTTP "+str(response.status_code)+
+                         " (contrôler le crédit, le quota et le modèle)")
+    data=response.json()
+    if search and not any(x.get("type")=="web_search_call" for x in data.get("output",[])):
+        raise ValueError("Recherche Web non attestée dans la réponse")
+    result=json.loads(extract_response_text(data))
+    if not isinstance(result,dict):
+        raise ValueError("Objet JSON attendu")
+    return result
+
 def proof(item):
     url=item.get("url")
     if not official(url):raise ValueError("Pas de source officielle acceptable")
@@ -132,10 +166,15 @@ def main():
         assert official("https://hellfest.fr/news")
         assert not official("https://news.google.com/rss/")
         assert norm("Écoute de Rock !")=="ecoute de rock"
+        assert json.loads(extract_response_text({
+            "status":"completed","output":[
+                {"type":"web_search_call","id":"call_1"},
+                {"type":"message","content":[{"type":"output_text","text":'{"test":true}'}]}
+            ]}))["test"] is True
         print("Tests préparateur publication : OK");return
-    key=os.getenv("GEMINI_API_KEY","").strip()
+    key=os.getenv("OPENAI_API_KEY","").strip()
     if not key:
-        print("Pas de secret GEMINI_API_KEY : rédaction complète désactivée, sans frais.")
+        print("Pas de secret OPENAI_API_KEY : rédaction complète désactivée, sans frais.")
         return
     if pending():
         print("Une proposition à publier est déjà en attente.");return
@@ -143,7 +182,7 @@ def main():
     files=sorted((ROOT/"data"/"candidats").glob(today+"*.md"),reverse=True)
     items=[]
     for file in files:items.extend(parse_digest(file.read_text(encoding="utf-8")))
-    for item in items[:3]:
+    for item in items[:2]:
         try:
             article,count=prepare(key,item)
             audit=ROOT/"redaction"/"validations"/(today+"-"+article["slug"]+".md")
