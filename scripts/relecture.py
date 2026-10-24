@@ -91,6 +91,7 @@ def serialize(proposal):
 def issue_body(proposal):
     text = (
         "### BACKSTAGE · Article prêt à lire\n\n"
+        "@"+EDITOR+" · Une nouvelle proposition est prête à lire.\n\n"
         "Tu trouveras ci-dessous **l'article intégral tel qu'il paraîtra sur le site**.\n\n"
         "**Pour le publier :** écris **PUBLIER** dans un commentaire en bas de la page.\n\n"
         "**Pour le refuser :** écris **REFUSER**.\n\n"
@@ -128,9 +129,14 @@ def offer():
     # Ne pas écrire index.html sur main, et ne pas déposer d'article
     # non approuvé dans une PR.
     active = api("GET", "/issues?state=open&per_page=100", token)
-    if any(i.get("title", "").startswith("[À VALIDER] ") and
-           "pull_request" not in i for i in active):
-        print("Une relecture est déjà en attente. Aucun nouveau brouillon envoyé.")
+    opened = [i for i in active if i.get("title", "").startswith("[À VALIDER] ")
+              and "pull_request" not in i]
+    if len(opened) >= 5:
+        print("La boîte de validation est pleine (5 articles).")
+        return
+    if any(i.get("title", "") == "[À VALIDER] " + proposal["article"]["title"]
+           for i in opened):
+        print("Cette actualité est déjà proposée à l'éditeur.")
         return
     article = proposal["article"]
     result = api("POST", "/issues", token, json={
