@@ -1,0 +1,33 @@
+name: BACKSTAGE — publier ou refuser un article
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+  pages: write
+
+jobs:
+  validation-editoriale:
+    if: ${{ !github.event.issue.pull_request && github.event.comment.user.login == 'Kristouff59' && (github.event.comment.body == 'PUBLIER' || github.event.comment.body == 'REFUSER') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Installer requests
+        run: python -m pip install 'requests>=2.31,<3'
+      - name: Tester la sécurité de publication
+        run: |
+          python scripts/relecture.py --self-test
+          python scripts/decision_publication.py --self-test
+      - name: Publier ou rejeter la proposition complète
+        run: python scripts/decision_publication.py --decide
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKSTAGE_EDITOR: Kristouff59
