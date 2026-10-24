@@ -1,70 +1,51 @@
-# BACKSTAGE — publier des articles assistés avec OpenAI
+# BACKSTAGE — boîte de validation des articles
 
-## Fonctionnement
-Le radar gratuit détecte les nouvelles musicales deux fois par jour.
-L'API OpenAI peut préparer un article, rechercher une annonce officielle et
-vérifier la présence d'au moins trois passages textuels sur cette page.
-Si elle ne dispose pas de preuves suffisantes, rien n'est proposé.
-Si un article passe les contrôles, GitHub ouvre une Pull Request intitulée
-**BACKSTAGE — article prêt à approuver**.
+## Le nouveau fonctionnement
 
-**Aucune publication automatique :** vous cliquez sur Merge pull request
-pour publier sur GitHub Pages, ou sur Close pull request pour rejeter.
-Cela implique toujours une responsabilité éditoriale humaine.
+Tu n'as **plus besoin d'utiliser les Pull Requests pour publier un article**.
 
-## Activer l'API OpenAI une seule fois
+1. GitHub Actions surveille l'actualité deux fois par jour.
+2. Les scripts et OpenAI recherchent des sources officielles et rédigent un article.
+3. Les contrôles automatiques peuvent refuser une proposition insuffisamment fondée.
+4. Quand un texte est suffisamment abouti, le robot crée une **Issue de relecture** dans le dépôt GitHub. Elle contient le texte intégral et les sources ; elle t'est assignée et elle te mentionne.
+5. Tu reçois une notification GitHub si tes réglages de notification le permettent. En ouvrant l'Issue, **tu lis immédiatement l'article complet**, sans consulter de code.
+6. Tu écris simplement `PUBLIER` en commentaire : GitHub vérifie que le commentaire provient de `Kristouff59`, puis ajoute le texte à BACKSTAGE et demande la reconstruction de GitHub Pages.
+7. Tu écris `REFUSER` : l'article est écarté et rien n'est ajouté au site.
 
-1. Ouvrir https://platform.openai.com/api-keys et se connecter.
-2. De préférence, créer un projet API distinct nommé BACKSTAGE.
-3. Créer une clé API dans ce projet.
-4. Ouvrir https://github.com/Kristouff59/media-festivals/settings/secrets/actions
-5. Cliquer New repository secret.
-6. Nom : `OPENAI_API_KEY`
-7. Valeur : votre clé privée OpenAI ; confirmer avec Add secret.
-8. Revenir dans https://github.com/Kristouff59/media-festivals/actions/workflows/veille.yml
-   puis cliquer Run workflow pour vérifier le fonctionnement.
+Pour voir tous tes textes en attente :
+https://github.com/Kristouff59/media-festivals/issues?q=is%3Aissue+is%3Aopen+assignee%3AKristouff59
 
-**Ne jamais insérer la clé API dans un fichier du dépôt public, dans le site
-ni dans une conversation.** Les secrets GitHub sont transmis seulement à
-l'exécution du workflow sur GitHub Actions.
+Pour recevoir des messages, vérifier les notifications GitHub et les préférences e-mail :
+https://github.com/settings/notifications
 
-## Facturation — point important
-L'abonnement ChatGPT Plus ne comprend pas l'utilisation de l'API OpenAI.
-Vous devrez disposer d'un compte API facturable ou de crédits disponibles.
+**Important : le dépôt est PUBLIC. Les Issues, y compris le texte non encore approuvé, sont visibles publiquement.**
+Ce système ne doit pas accueillir de contenu confidentiel ou sous embargo.
+Pour un espace éditorial privé, il faudrait passer par un dépôt GitHub privé séparé ou un outil d'approbation doté d'une connexion sécurisée.
 
-Le modèle configuré est `gpt-5.4-mini` avec OpenAI Responses API.
-La recherche Web utilise l'outil officiel `web_search`.
-La facturation tient compte des tokens et des recherches Web.
+## Sécurité, publication et limites
 
-Les appels sont limités à **deux candidats maximum par passage du radar** ;
-chaque candidat peut utiliser une recherche Web et, en cas de source suffisamment
-corroborée, un appel supplémentaire de rédaction. Tant qu'une proposition de
-publication est ouverte, l'automatisation s'abstient de proposer un nouvel article.
+- Les textes ne sont jamais publiés sans un commentaire de l'éditeur contenant exactement `PUBLIER`.
+- Seul le compte GitHub `Kristouff59` est autorisé par le workflow de décision.
+- Les nouvelles fiches sont créées uniquement par GitHub Actions ; leur contenu éditorial est scellé par une empreinte de contrôle pour éviter les modifications non souhaitées.
+- GitHub refuse de remplacer un article ou une fiche festival modifiée depuis la préparation.
+- Les sources officielles restent consultables, discrètement, sous les articles.
+- Le système accepte jusqu'à **cinq propositions simultanées**, pour éviter qu'un seul article non traité n'arrête la rédaction.
+- Une approbation fait un commit sur `main` et demande une reconstruction GitHub Pages. Un problème d'autorisation Pages ou de configuration peut empêcher la mise en ligne automatique ; le commentaire de résultat dans l'Issue signale cette difficulté.
+- Les vérifications documentaires automatisées réduisent les erreurs, mais ne sont pas infaillibles. L'éditeur garde la responsabilité de publication.
 
-Réglez un plafond de dépenses et les alertes appropriées dans
-https://platform.openai.com/settings/organization/limits
-et suivez l'utilisation sur https://platform.openai.com/usage.
-Les alertes et budgets souples ne constituent pas nécessairement des limites
-de dépenses bloquantes ; vérifier les contrôles disponibles sur le compte.
-L'absence de clé signifie zéro appel API.
+## Consommation de l'API
 
-## Exigence journalistique
-- Rock comme culture de référence ; ouverture à tous les genres.
-- Un article sensible, humain et vivant, sans langue administrative.
-- Une curiosité pour les réalités sociales de la musique live, non partisane.
-- Informations primaires confirmées et citations discrètes sous l'article.
-- Pas de reportage inventé, pas de copie d'article tiers.
-- Brève courte quand les faits sont rares ; format long quand c'est justifié.
-- Les vérifications automatiques réduisent les erreurs, sans les éliminer.
-- Une source inaccessible, une mauvaise correspondance ou un doute
-  significatif entraîne l'abandon de la proposition.
-- Aucun média ne peut garantir la publication de toutes les annonces importantes.
+- Secret GitHub : `OPENAI_API_KEY` (ne jamais le publier).
+- Modèle : `gpt-5.4-mini`, via Responses API, avec recherche Web OpenAI.
+- La veille RSS Google Actualités reste gratuite hors cas de secours OpenAI.
+- Le moteur traite au maximum deux sujets potentiels par exécution du radar ; il peut en proposer au plus un par exécution.
+- Le compte API OpenAI est distinct de ChatGPT Plus et peut être facturé.
+- Consulter https://platform.openai.com/usage et les limites de consommation.
 
 ## Dépannage
-- Un workflow vert avec zéro article n'est pas nécessairement un problème :
-  l'actualité peut manquer de sources officielles corroborables.
-- `OPENAI_API_KEY` absent : le radar fonctionne mais la rédaction n'est pas activée.
-- HTTP 401 : clé invalide ; HTTP 429 : limite / crédit API possiblement épuisé.
-- Le journal GitHub ne doit jamais afficher la valeur de la clé.
-- Chaque nouvelle proposition de publication est une Pull Request distincte
-  du radar `bot/radar-musique-live` ; la fusion des fiches de veille ne publie rien.
+
+- Workflow vert sans nouvelle Issue : aucun texte n'a satisfait les vérifications, ou le nombre maximal de propositions est atteint.
+- Une nouvelle Issue peut déclencher une alerte GitHub par assignation et mention ; la livraison par e-mail dépend de tes paramètres GitHub.
+- Tu peux lire un article complet depuis un navigateur ou l'application GitHub sur ton téléphone.
+- Si une décision échoue, consulter Actions → BACKSTAGE — publier ou refuser un article.
+- La veille ne génère plus de Pull Requests de suivi ; les données du radar sont archivées automatiquement.
