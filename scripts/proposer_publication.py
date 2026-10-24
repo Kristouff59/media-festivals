@@ -338,11 +338,12 @@ def pending():
     token=os.getenv("GITHUB_TOKEN")
     if not token:return False
     repo=os.getenv("GITHUB_REPOSITORY","Kristouff59/media-festivals")
-    r=S.get("https://api.github.com/repos/"+repo+"/pulls",
+    r=S.get("https://api.github.com/repos/"+repo+"/issues",
         params={"state":"open","per_page":100},
         headers={"Authorization":"Bearer "+token},timeout=15)
     r.raise_for_status()
-    return any(x.get("head",{}).get("ref")=="bot/article-a-publier" for x in r.json())
+    return any(x.get("title","").startswith("[À VALIDER] ") and
+               not x.get("pull_request") for x in r.json())
 def main():
     if "--self-test" in sys.argv:
         assert official("https://hellfest.fr/news")
@@ -371,7 +372,7 @@ def main():
         print("Pas de secret OPENAI_API_KEY : rédaction complète désactivée, sans frais.")
         return
     if pending():
-        print("Une proposition à publier est déjà en attente.");return
+        print("Un article complet est déjà en attente dans la boîte de validation.");return
     today=datetime.now(timezone.utc).strftime("%Y-%m-%d")
     files=sorted((ROOT/"data"/"candidats").glob(today+"*.md"),reverse=True)
     items=[]
