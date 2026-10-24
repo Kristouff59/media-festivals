@@ -63,8 +63,10 @@ jobs:
           fs.writeFileSync('/tmp/backstage-editorial.js', scripts.join('\n'));
           NODE
           node --check /tmp/backstage-editorial.js
-      - name: Vérifier le système de relecture
-        run: python scripts/relecture.py --self-test
+      - name: Vérifier le système de relecture et de décision
+        run: |
+          python scripts/relecture.py --self-test
+          python scripts/decision_publication.py --self-test
       - name: Envoyer le texte complet à l'éditeur et l'avertir
         run: python scripts/relecture.py --offer
         env:
