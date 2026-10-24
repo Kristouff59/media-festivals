@@ -8,12 +8,15 @@ on:
       - 'scripts/veille.py'
       - 'scripts/preparer_articles.py'
       - 'scripts/proposer_publication.py'
+      - 'scripts/relecture.py'
+      - 'scripts/decision_publication.py'
       - '.github/workflows/veille.yml'
   schedule:
     - cron: '17 7,18 * * *'
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 jobs:
   veille:
     runs-on: ubuntu-latest
@@ -57,22 +60,13 @@ jobs:
           fs.writeFileSync('/tmp/backstage-editorial.js', scripts.join('\n'));
           NODE
           node --check /tmp/backstage-editorial.js
-      - name: Soumettre l'article validé techniquement pour approbation
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: bot/article-a-publier
-          delete-branch: true
-          title: 'BACKSTAGE — article prêt à approuver'
-          commit-message: 'rédaction: proposer un article vérifié et prêt à publier'
-          body: |
-            Proposition d'article mise en forme dans index.html.
-            Les extraits factuels ont été retrouvés sur une page de source primaire.
-            Un contrôle automatique réduit le risque d'erreur, mais n'est pas infaillible.
-            Fusionner = publier l'article. Fermer = rejeter.
-            Les sources restent visibles discrètement sous l'article.
-          add-paths: |
-            index.html
-            redaction/validations/*.md
+      - name: Vérifier le système de relecture
+        run: python scripts/relecture.py --self-test
+      - name: Envoyer le texte complet à l'éditeur et l'avertir
+        run: python scripts/relecture.py --offer
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKSTAGE_EDITOR: Kristouff59
       - name: Restaurer les fichiers de veille après la proposition d'article
         run: |
           mkdir -p data
