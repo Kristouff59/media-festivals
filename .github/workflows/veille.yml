@@ -71,18 +71,17 @@ jobs:
         run: |
           mkdir -p data
           cp -a /tmp/backstage-radar-data/. data/
-      - name: Proposer la sélection à relire
-        uses: peter-evans/create-pull-request@v7
-        with:
-          branch: bot/radar-musique-live
-          delete-branch: true
-          title: 'BACKSTAGE — nouvelles pistes éditoriales à vérifier'
-          commit-message: 'radar: préparer des sujets musique live à vérifier'
-          body: |
-            Ce dossier contient des sujets repérés par des flux d'agrégation.
-            Ces titres ne sont PAS des faits vérifiés : vérifier les sources primaires.
-            Ne pas reprendre le texte des médias. Aucune publication automatique.
-            Les fiches proposées dans data/brouillons contiennent des plans et des
-            vérifications à mener, pas des articles prêts à publier.
-            Fusionner pour enregistrer les titres déjà vus et éviter les doublons.
-          add-paths: data/
+      - name: Archiver la veille directement, sans demande de validation
+        shell: bash
+        run: |
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Aucune nouvelle donnée de veille"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'radar: mémoriser les nouvelles pistes'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
