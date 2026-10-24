@@ -13,6 +13,9 @@ on:
       - '.github/workflows/veille.yml'
   schedule:
     - cron: '17 7,18 * * *'
+concurrency:
+  group: backstage-radar-main
+  cancel-in-progress: true
 permissions:
   contents: write
   pull-requests: write
@@ -83,5 +86,9 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'radar: mémoriser les nouvelles pistes'
           git fetch origin main
-          git rebase origin/main
+          if ! git rebase origin/main; then
+            git rebase --abort
+            echo "::warning::Échec de fusion de données de veille : mise en concurrence détectée. La prochaine exécution reprendra la veille."
+            exit 0
+          fi
           git push origin HEAD:main
