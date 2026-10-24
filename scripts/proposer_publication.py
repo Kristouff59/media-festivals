@@ -342,8 +342,9 @@ def pending():
         params={"state":"open","per_page":100},
         headers={"Authorization":"Bearer "+token},timeout=15)
     r.raise_for_status()
-    return any(x.get("title","").startswith("[À VALIDER] ") and
-               not x.get("pull_request") for x in r.json())
+    return sum(1 for x in r.json()
+               if x.get("title","").startswith("[À VALIDER] ") and
+               not x.get("pull_request")) >= 5
 def main():
     if "--self-test" in sys.argv:
         assert official("https://hellfest.fr/news")
@@ -372,7 +373,7 @@ def main():
         print("Pas de secret OPENAI_API_KEY : rédaction complète désactivée, sans frais.")
         return
     if pending():
-        print("Un article complet est déjà en attente dans la boîte de validation.");return
+        print("Cinq articles sont déjà en attente de validation : nouvelle rédaction différée.");return
     today=datetime.now(timezone.utc).strftime("%Y-%m-%d")
     files=sorted((ROOT/"data"/"candidats").glob(today+"*.md"),reverse=True)
     items=[]
