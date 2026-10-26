@@ -1,4 +1,20 @@
-# BACKSTAGE — rédaction privée, sans validation GitHub
+# BACKSTAGE — architecture éditoriale Supabase + OpenAI
+
+**Nouvelle architecture privilégiée (26 octobre 2026).** L'article complet,
+la validation et la publication se font depuis BACKSTAGE `/admin/`.
+Le moteur de veille autonome est préparé dans Supabase Edge Functions, mais
+**il n'est pas encore déployé ni programmé sur le projet Supabase**.
+Tant que les tests réels ne sont pas achevés, l'ancien radar GitHub
+reste actif pour éviter une interruption.
+
+**Procédure de mise en service :**
+[MIGRATION_SUPABASE_OPENAI.md](MIGRATION_SUPABASE_OPENAI.md)
+
+Le reste de cette page décrit l'ancien circuit de transition, conservé
+uniquement jusqu'au basculement définitif.
+
+---
+
 
 ## Ce que voit la rédaction
 
