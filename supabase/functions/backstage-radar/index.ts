@@ -161,3 +161,157 @@ async function notify(a, id) {
     return r.ok ? "email_envoye" : "email_echec_HTTP_" + r.status;
   } catch (_) { return "email_echec_reseau"; }
 }
+
+const legacyTitles = [
+  "We Love Green 2027 premiers noms Fontaines D.C. Angèle",
+  "Hellfest 2027 dates billetterie",
+  "Oasis Paris 2027 concerts",
+  "Toto tournée 2027",
+  "Jeanne Added tournée 2027",
+  "Khalid Salle Pleyel concert 2026",
+];
+async function run(key) {
+  const pending = await data("editorial_drafts?select=id&status=eq.pending&limit=5", key);
+  if (pending.length >= 5) return { result: "cinq_articles_en_attente" };
+
+  // Un seul lancement payant par demi-journée UTC, même si Cron réessaie.
+  const now = new Date();
+  const slot = now.toISOString().slice(0, 10) +
+    (now.getUTCHours() < 12 ? "-matin" : "-soir");
+  const lock = await data("editorial_radar_runs?on_conflict=slot", key, "POST",
+    [{ slot, status: "running" }], "resolution=ignore-duplicates,return=representation");
+  if (!lock.length) return { result: "radar_deja_execute", slot };
+  let outcome = "sans_annonce";
+  try {
+    const recent = await data("editorial_drafts?select=topic_key,title&order=created_at.desc&limit=60", key);
+    const existingKeys = new Set(recent.map(x => x.topic_key).filter(Boolean));
+    const previousTitles = [...recent.map(x => x.title), ...legacyTitles];
+    const discovery = await openai(
+      "Tu es rédacteur en chef de BACKSTAGE, média indépendant de musique LIVE, en français. " +
+      "Date actuelle UTC : " + now.toISOString().slice(0, 10) + ". " +
+      "Utilise une VRAIE recherche Web pour découvrir des annonces publiées dans les 7 derniers jours. " +
+      "Choisis jusqu'à TROIS grandes annonces parmi festivals et programmations, rock / post-punk " +
+      "et scènes alternatives, tournées majeures, retours de groupes, pop, électro, rap, et société du live. " +
+      "Privilégie leur impact éditorial, pas la proximité géographique. " +
+      "France et pays voisins bienvenus, mais ne te limite pas à de petits événements locaux. " +
+      "Ne propose pas de liste d'agendas génériques, de rumeurs, ni une annonce déjà connue : " +
+      JSON.stringify(previousTitles.slice(0, 45)) + ". " +
+      "Trouve pour chaque sujet une page de source PRIMAIRE accessible en HTTPS : " +
+      "festival, artiste, salle officielle, producteur ou organisateur. " +
+      "Fournis deux citations assez longues copiées EXACTEMENT de la page officielle. " +
+      "Ne fabrique jamais une citation. Si rien n'est suffisamment confirmé, candidats vides. " +
+      "Réponds uniquement par un objet JSON SANS Markdown : " +
+      '{"candidates":[{"topic":"Annonce précise de cette semaine",'+
+      '"topic_key":"sujet-evenement-annee-cle-stable",'+
+      '"why_now":"Ce qui vient réellement d’être annoncé",'+
+      '"official_url":"https://site-officiel/page",'+
+      '"quotes":["extrait exact assez long de la page","autre extrait exact"],'+
+      '"festival_name":"Nom du festival ou chaîne vide"}]}. ' +
+      "Maximum trois candidats, du plus intéressant au moins intéressant.",
+      true
+    );
+    if (!Array.isArray(discovery.candidates)) throw Error("Aucun tableau de sujets");
+    let chosen = null;
+    for (const news of discovery.candidates.slice(0, 3)) {
+      if (!news || typeof news.topic !== "string" || news.topic.length < 20 ||
+          typeof news.topic_key !== "string" ||
+          !/^[a-z0-9-]{12,130}$/.test(news.topic_key) ||
+          existingKeys.has(news.topic_key)) continue;
+      try {
+        const proof = await verify(news);
+        if (proof) { chosen = { news, proof }; break; }
+      } catch (_) { /* source officielle indisponible : sujet suivant */ }
+    }
+    if (!chosen) {
+      outcome = "aucune_source_officielle_verifiee";
+      return { result: outcome };
+    }
+    const { news, proof } = chosen;
+    const article = await openai(
+      "Rédige un VRAI article journalistique en français pour BACKSTAGE, " +
+      "dans un style vivant et humain, précis, sans publicité, sans copier la source, " +
+      "sans citations fabriquées ni expérience de terrain inventée. " +
+      "Entre 220 et 480 mots, chapô, paragraphes et intertitres. " +
+      "Ne mentionne jamais une date, un prix, une ville ou un artiste qui ne sont pas présents dans la source. " +
+      "Sujet : " + news.topic + ". Actualité : " + news.why_now + ". " +
+      "Source officielle (seule base factuelle autorisée) : " + proof.url + "\n" +
+      proof.source.slice(0, 11000) + "\n" +
+      "Retourne un JSON valide et UNIQUEMENT un JSON : " +
+      '{"title":"titre précis","excerpt":"chapô complet",'+
+      '"category":"FESTIVALS","body":["paragraphe 1","paragraphe 2"],'+
+      '"sections":[{"title":"intertitre","paragraphs":["paragraphe 3","paragraphe 4"]}],'+
+      '"festival":null}. ' +
+      'Pour un concert utiliser category CONCERTS ; pour un enjeu de société utiliser SOCIÉTÉ. ' +
+      'Si ET SEULEMENT SI le sujet présente des artistes confirmés d’une même édition de festival, ' +
+      'remplacer festival null par ' +
+      '{"name":"Nom","city":"Ville","country":"France","dates":"dates annoncées",'+
+      '"editionYear":2027,"lineup":[{"day":"Jour et date","artists":["Artiste 1","Artiste 2"]}]}. ' +
+      "N'inscris rien d'invérifiable dans le texte ou la fiche festival.",
+      false
+    );
+    if (!articleValid(article, proof.source)) {
+      outcome = "article_ecarte_controle_qualite";
+      return { result: outcome };
+    }
+    const hash = await digest(news.topic_key + "|" + proof.url);
+    const prose = [...article.body, ...article.sections.flatMap(s => s.paragraphs)].join(" ");
+    const row = {
+      slug: slug(article.title) + "-" + hash.slice(0, 8),
+      title: article.title, excerpt: article.excerpt, category: article.category,
+      body: article.body, sections: article.sections,
+      date: now.toISOString().slice(0, 10),
+      format: article.category === "SOCIÉTÉ" ? "DÉCRYPTAGE" : "ACTUALITÉ",
+      readMinutes: Math.max(2, Math.round(count(prose) / 210)),
+      visual: "visual-b", artword: "LIVE", byline: "BACKSTAGE · La rédaction",
+      sources: [{ label: "Annonce officielle", url: proof.url }],
+    };
+    const payload = { article: row, previous: null,
+      festivals: festivalChanges(article.festival, proof.source, proof.url) };
+    const fingerprint = await digest(JSON.stringify(payload));
+    const inserted = await data("editorial_drafts?on_conflict=topic_key", key,
+      "POST", [{
+        fingerprint, topic_key: news.topic_key, slug: row.slug, title: row.title,
+        excerpt: row.excerpt, payload, status: "pending",
+      }], "resolution=ignore-duplicates,return=representation");
+    if (!inserted.length) {
+      outcome = "article_deja_propose";
+      return { result: outcome };
+    }
+    const notification = await notify(row, fingerprint);
+    outcome = "article_a_valider";
+    return { result: outcome, title: row.title, notification };
+  } catch (error) {
+    outcome = "erreur : " + String(error instanceof Error ? error.message : error).slice(0, 180);
+    throw error;
+  } finally {
+    try {
+      await data("editorial_radar_runs?slot=eq." + encodeURIComponent(slot),
+        key, "PATCH", { status: outcome.startsWith("erreur") ? "failed" : "completed",
+          detail: outcome.slice(0, 440), finished_at: new Date().toISOString() },
+        "return=minimal");
+    } catch (error) { console.error("Erreur journal du radar", String(error)); }
+  }
+}
+Deno.serve(async request => {
+  if (request.method !== "POST") return Response.json({ error: "method_not_allowed" }, { status: 405 });
+  const key = secret();
+  if (!key || !allowed(request.headers.get("apikey") || "", key)) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  if (!root || !env("OPENAI_API_KEY")) {
+    return Response.json({ error: "missing_OPENAI_API_KEY_or_project_URL" }, { status: 503 });
+  }
+  try {
+    const input = await request.json().catch(() => ({}));
+    if (input.healthcheck === true) {
+      const rows = await data("editorial_drafts?select=id&limit=1", key);
+      return Response.json({ ok: true, engine: "supabase-openai", db: Array.isArray(rows) ? "ok" : "error",
+        model, email_configured: !!(env("RESEND_API_KEY") && env("BACKSTAGE_FROM_EMAIL") && env("BACKSTAGE_ALERT_EMAIL")) });
+    }
+    return Response.json(await run(key));
+  } catch (error) {
+    const detail = String(error instanceof Error ? error.message : error).slice(0, 200);
+    console.error("BACKSTAGE", detail);
+    return Response.json({ error: "radar_failed", detail }, { status: 500 });
+  }
+});
