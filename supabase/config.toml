@@ -1,0 +1,4 @@
+# BACKSTAGE : la fonction est appelée par Supabase Cron avec la clé serveur
+# dans l'en-tête apikey. Elle vérifie elle-même ce secret avant tout appel OpenAI.
+[functions.backstage-radar]
+verify_jwt = false
