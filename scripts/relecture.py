@@ -126,6 +126,18 @@ def offer():
         print("Aucun nouvel article complet à soumettre.")
         return
     proposal = build_proposal(parse_site(base), parse_site(current))
+    # Avec Supabase configuré, l'éditeur n'a plus jamais à ouvrir GitHub.
+    # Les brouillons restent privés en base, aucun article non approuvé
+    # n'est envoyé dans les Issues publiques.
+    from supabase_queue import configured, enqueue
+    if configured():
+        try:
+            enqueue(proposal)
+        finally:
+            SITE.write_text(base, encoding="utf-8")
+        return
+    # Mode de transition tant que la base Supabase privée n'est pas prête :
+    # ancien système GitHub Issues conservé, sans bloquer la veille.
     # Ne pas écrire index.html sur main, et ne pas déposer d'article
     # non approuvé dans une PR.
     active = api("GET", "/issues?state=open&per_page=100", token)
