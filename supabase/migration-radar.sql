@@ -14,7 +14,15 @@ create table if not exists public.editorial_radar_runs (
 );
 alter table public.editorial_radar_runs enable row level security;
 revoke all on public.editorial_radar_runs from anon, authenticated;
--- Cette table est réservée à la clé serveur, jamais au navigateur.
+grant select on public.editorial_radar_runs to authenticated;
+drop policy if exists editorial_admin_radar_status on public.editorial_radar_runs;
+create policy editorial_admin_radar_status on public.editorial_radar_runs
+  for select to authenticated using (
+    exists (select 1 from public.editorial_admins a
+            where a.user_id = (select auth.uid()))
+  );
+-- Seuls les rédacteurs connectés peuvent consulter le statut du radar.
+-- Aucune insertion ou modification depuis le navigateur.
 
 -- Les droits RLS existants des articles sont préservés.
 -- Aucun job Cron n'est créé par cette migration :
