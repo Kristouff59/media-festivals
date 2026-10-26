@@ -4,7 +4,7 @@
 
 - Accès : https://kristouff59.github.io/media-festivals/admin/
 - Après mise sur votre propre domaine : `https://votre-domaine/admin/`
-- Connexion privée par lien reçu à l'adresse e-mail autorisée.
+- Connexion privée par e-mail et mot de passe : un compte rédacteur créé dans Supabase Auth, sans nécessité de serveur SMTP.
 - Liste des articles **complets**, avec titres, intertitres, paragraphes et sources.
 - **Publier cet article** : l'article devient directement visible sur le site public sans Pull Request ni déploiement GitHub.
 - **Refuser** : l'article est écarté, aucune publication.
@@ -20,11 +20,11 @@ Le site et son tableau de bord sont installés dans le dépôt, mais **l'espace 
 
 1. Sur https://supabase.com/dashboard, créer un **nouveau projet distinct** intitulé `BACKSTAGE` (ne pas réutiliser la base de vos autres projets).
 2. Dans l'éditeur SQL du projet, exécuter `supabase/schema.sql`.
-3. Dans Authentication > Users, créer ou inviter **votre utilisateur rédacteur**. Utiliser idéalement la même adresse que celle associée à votre compte Supabase, ou configurer un serveur SMTP personnalisé ; l'e-mail par défaut de Supabase est limité aux adresses autorisées et à un très faible débit.
-4. Dans Authentication > Users, copier l'identifiant UUID de cet utilisateur.
+3. Dans Authentication > Users > Add user > Create new user, créer **votre utilisateur rédacteur**, avec votre adresse e-mail et un mot de passe fort. Laisser **Auto Confirm User** activé pour pouvoir vous connecter immédiatement sans SMTP. Le mot de passe ne doit jamais être commité ni partagé.
+4. Dans Authentication > Users, copier l'identifiant UUID (User UID) de cet utilisateur.
 5. Dans SQL Editor, exécuter :
    `insert into public.editorial_admins(user_id) values ('VOTRE-UUID-ICI');`
-6. Dans Authentication > URL Configuration, autoriser comme Redirect URL :
+6. Optionnel pour l'authentification par mot de passe ; utile si des liens de réinitialisation ou invitations sont activés : dans Authentication > URL Configuration, autoriser comme Redirect URL :
    `https://kristouff59.github.io/media-festivals/admin/`.
    Après migration de domaine, remplacer ou ajouter `https://votre-domaine/admin/`.
 
