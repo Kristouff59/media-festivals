@@ -35,8 +35,8 @@
 const db = window.BACKSTAGE_CONTENT || {settings:{},articles:[],festivals:[]};
 const settings = db.settings || {};
 const articleTime = a => Date.parse(a.updatedAt || (String(a.date)+'T00:00:00Z')) || 0;
-const articles = [...db.articles].sort((a,b) => articleTime(b)-articleTime(a));
-const festivals = db.festivals || [];
+let articles = [...db.articles].sort((a,b) => articleTime(b)-articleTime(a));
+let festivals = db.festivals || [];
 const app = document.getElementById('app');
 const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ext = u => /^https:\/\//.test(String(u||'')) ? u : '#/festivals';
@@ -69,7 +69,40 @@ function articlePage(slug){
  return `<article class="longread"><a href="#/magazine" class="back">← Retour aux actualités</a><div class="article-meta" style="margin-top:30px">${esc(a.category)} <span>•</span> ${esc(a.format||"ÉDITORIAL")} <span>•</span> ${esc(prettyDate(a.date))}${a.updatedAt?` <span>•</span> Mis à jour le ${esc(prettyDate(a.updatedAt.slice(0,10)))}`:""} <span>•</span> ${Number(a.readMinutes)||3} min</div><h1>${esc(a.title)}</h1><p class="deck">${esc(a.excerpt)}</p>${media(a)}<div>${(a.body||[]).map(p=>`<p class="bodypara">${esc(p)}</p>`).join('')}</div>${sections}${sourceMarkup}</article>`;
 }
 function render(){const hash = decodeURIComponent(location.hash.replace(/^#/,'')) || '/';const current = hash.startsWith('/article/')?'#/magazine':`#${hash}`;let page = homescreen();if(hash==='/magazine')page=magazine();else if(hash==='/festivals')page=festivalsPage();else if(hash==='/concerts')page=concertsPage();else if(hash==='/societe')page=societePage();else if(hash==='/dossiers')page=dossiersPage();else if(hash==='/methode')page=methodPage();else if(hash==='/professionnels')page=proPage();else if(hash.startsWith('/article/'))page=articlePage(hash.slice(9));app.innerHTML=header(current)+`<main id="main">${page}</main>`+footer();document.title = hash==='/'?`${settings.brand||'BACKSTAGE'} — Le live, sans frontières`:`${hash.startsWith('/article/')?(articles.find(a=>a.slug===hash.slice(9))?.title||'Article'):hash==='/magazine'?'Magazine':hash==='/festivals'?'Festivals':hash==='/methode'?'Notre méthode':'Professionnels'} | ${settings.brand||'BACKSTAGE'}`;document.getElementById('menu-toggle')?.addEventListener('click',()=>{menuOpen=!menuOpen;document.querySelector('.nav')?.classList.toggle('open',menuOpen);document.getElementById('menu-toggle').setAttribute('aria-expanded',String(menuOpen));document.getElementById('menu-toggle').textContent=menuOpen?'Fermer':'Menu ☰'});document.querySelectorAll('.nav a').forEach(e=>e.addEventListener('click',()=>menuOpen=false));const search=document.getElementById('search-articles');if(search) search.addEventListener('input',()=>{const term=search.value.trim().toLocaleLowerCase('fr');const matched=articles.filter(a=>[a.title,a.excerpt,a.category].join(' ').toLocaleLowerCase('fr').includes(term));document.getElementById('article-results').innerHTML=matched.length?matched.map(card).join(''):'<p class="empty">Aucun article pour cette recherche.</p>'});document.querySelectorAll('[data-country]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-country]').forEach(x=>{x.classList.remove('active');x.setAttribute('aria-pressed','false')});b.classList.add('active');b.setAttribute('aria-pressed','true');const c=b.getAttribute('data-country');const matched=festivals.filter(f=>c==='Tous'||f.country===c);document.getElementById('festival-results').innerHTML=matched.map(festCard).join('')}))}
+
+async function loadPublishedFromEditorialDatabase(){
+  // Les brouillons restent privés : seuls les articles approuvés sont retournés par RLS.
+  const {SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY}=await import('./admin/config.js');
+  if(!SUPABASE_URL.startsWith('https://')||SUPABASE_URL.includes('VOTRE-PROJET')||
+      SUPABASE_PUBLISHABLE_KEY.length<24)return;
+  const endpoint=SUPABASE_URL.replace(/\/+$/,'')+
+      '/rest/v1/editorial_drafts?select=payload,published_at&status=eq.published&order=published_at.desc&limit=100';
+  const res=await fetch(endpoint,{headers:{apikey:SUPABASE_PUBLISHABLE_KEY},cache:'no-store'});
+  if(!res.ok)throw new Error('Synchronisation éditoriale indisponible');
+  const rows=await res.json();
+  if(!Array.isArray(rows))return;
+  const mergedArticles=new Map(db.articles.map(a=>[a.slug,a]));
+  const mergedFestivals=new Map((db.festivals||[]).map(f=>[f.name.toLocaleLowerCase('fr'),f]));
+  for(const row of rows.reverse()){
+    const proposal=row.payload||{};
+    const a=proposal.article;
+    if(a&&typeof a.slug==='string'&&a.sources&&Array.isArray(a.body)){
+      mergedArticles.set(a.slug,{...a,updatedAt:row.published_at||a.updatedAt});
+    }
+    for(const change of proposal.festivals||[]){
+      const item=change.new;
+      if(item&&typeof item.name==='string'){
+        mergedFestivals.set(item.name.toLocaleLowerCase('fr'),item);
+      }
+    }
+  }
+  articles=[...mergedArticles.values()].sort((a,b)=>articleTime(b)-articleTime(a));
+  festivals=[...mergedFestivals.values()];
+  render();
+}
+
 window.addEventListener('hashchange',()=>{render();window.scrollTo({top:0,behavior:'instant'})});render();
+void loadPublishedFromEditorialDatabase().catch(()=>{/* Site statique disponible en secours. */});
 })();
 </script>
 </body>
