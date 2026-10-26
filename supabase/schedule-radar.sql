@@ -33,7 +33,7 @@ select cron.schedule(
         )
       ),
       body := '{"source":"cron"}'::jsonb,
-      timeout_milliseconds := 10000
+      timeout_milliseconds := 130000
     );
   $job$
 );
