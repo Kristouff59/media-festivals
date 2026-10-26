@@ -9,6 +9,7 @@ on:
       - 'scripts/preparer_articles.py'
       - 'scripts/proposer_publication.py'
       - 'scripts/relecture.py'
+      - 'scripts/supabase_queue.py'
       - 'scripts/decision_publication.py'
       - '.github/workflows/veille.yml'
   schedule:
@@ -52,6 +53,8 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       - name: Contrôler la syntaxe du magazine après rédaction
         shell: bash
         run: |
@@ -67,11 +70,18 @@ jobs:
         run: |
           python scripts/relecture.py --self-test
           python scripts/decision_publication.py --self-test
+          python scripts/supabase_queue.py --self-test
       - name: Envoyer le texte complet à l'éditeur et l'avertir
         run: python scripts/relecture.py --offer
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BACKSTAGE_EDITOR: Kristouff59
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          BACKSTAGE_ALERT_EMAIL: ${{ secrets.BACKSTAGE_ALERT_EMAIL }}
+          BACKSTAGE_FROM_EMAIL: ${{ secrets.BACKSTAGE_FROM_EMAIL }}
+          BACKSTAGE_SITE_URL: ${{ vars.BACKSTAGE_SITE_URL }}
       - name: Restaurer les fichiers de veille après la proposition d'article
         run: |
           mkdir -p data
