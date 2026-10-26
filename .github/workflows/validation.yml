@@ -4,6 +4,11 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'admin/**'
+      - 'supabase/schema.sql'
+      - 'scripts/relecture.py'
+      - 'scripts/supabase_queue.py'
+      - 'scripts/proposer_publication.py'
       - '.github/workflows/validation.yml'
   pull_request:
     branches: [main]
@@ -32,6 +37,26 @@ jobs:
           console.log('Scripts extraits :',scripts.length);
           NODE
           node --check /tmp/backstage-scripts.js
+      - name: Vérifier le JavaScript de la rédaction
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          h=Path('admin/index.html').read_text(encoding='utf8')
+          m=re.search(r'<script type="module">([\s\S]+?)</script>',h)
+          assert m, 'Module de rédaction absent'
+          Path('/tmp/backstage-admin.mjs').write_text(m.group(1),encoding='utf8')
+          assert 'VOTRE-PROJET' in Path('admin/config.js').read_text(encoding='utf8') or 'supabase.co' in Path('admin/config.js').read_text(encoding='utf8')
+          PY
+          node --check /tmp/backstage-admin.mjs
+          node --check admin/config.js
+      - name: Vérifier les scripts de publication
+        run: |
+          python -m pip install -q 'requests>=2.31,<3'
+          python -m py_compile scripts/relecture.py scripts/supabase_queue.py scripts/proposer_publication.py
+          python scripts/relecture.py --self-test
+          python scripts/supabase_queue.py --self-test
       - name: Contrôler les liens éditoriaux et les catégories
         run: |
           python - <<'PY'
