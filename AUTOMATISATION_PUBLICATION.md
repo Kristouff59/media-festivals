@@ -1,51 +1,87 @@
-# BACKSTAGE — boîte de validation des articles
+# BACKSTAGE — rédaction privée, sans validation GitHub
 
-## Le nouveau fonctionnement
+## Ce que voit la rédaction
 
-Tu n'as **plus besoin d'utiliser les Pull Requests pour publier un article**.
+- Accès : https://kristouff59.github.io/media-festivals/admin/
+- Après mise sur votre propre domaine : `https://votre-domaine/admin/`
+- Connexion privée par lien reçu à l'adresse e-mail autorisée.
+- Liste des articles **complets**, avec titres, intertitres, paragraphes et sources.
+- **Publier cet article** : l'article devient directement visible sur le site public sans Pull Request ni déploiement GitHub.
+- **Refuser** : l'article est écarté, aucune publication.
+- Une actualité de festival peut modifier simultanément sa fiche programmation.
 
-1. GitHub Actions surveille l'actualité deux fois par jour.
-2. Les scripts et OpenAI recherchent des sources officielles et rédigent un article.
-3. Les contrôles automatiques peuvent refuser une proposition insuffisamment fondée.
-4. Quand un texte est suffisamment abouti, le robot crée une **Issue de relecture** dans le dépôt GitHub. Elle contient le texte intégral et les sources ; elle t'est assignée et elle te mentionne.
-5. Tu reçois une notification GitHub si tes réglages de notification le permettent. En ouvrant l'Issue, **tu lis immédiatement l'article complet**, sans consulter de code.
-6. Tu écris simplement `PUBLIER` en commentaire : GitHub vérifie que le commentaire provient de `Kristouff59`, puis ajoute le texte à BACKSTAGE et demande la reconstruction de GitHub Pages.
-7. Tu écris `REFUSER` : l'article est écarté et rien n'est ajouté au site.
+Les brouillons sont conservés dans une base Supabase privée. Les visiteurs non connectés ne voient que les articles **déjà publiés** ; le moteur historique statique reste en place pour les articles plus anciens.
 
-Pour voir tous tes textes en attente :
-https://github.com/Kristouff59/media-festivals/issues?q=is%3Aissue+is%3Aopen+assignee%3AKristouff59
+Le site et son tableau de bord sont installés dans le dépôt, mais **l'espace privé n'est pas opérationnel avant les étapes de configuration ci-dessous**. Pendant cette transition, la veille utilise l'ancien circuit GitHub Issues pour éviter d'interrompre la production éditoriale.
 
-Pour recevoir des messages, vérifier les notifications GitHub et les préférences e-mail :
-https://github.com/settings/notifications
+## Mise en service (une seule fois)
 
-**Important : le dépôt est PUBLIC. Les Issues, y compris le texte non encore approuvé, sont visibles publiquement.**
-Ce système ne doit pas accueillir de contenu confidentiel ou sous embargo.
-Pour un espace éditorial privé, il faudrait passer par un dépôt GitHub privé séparé ou un outil d'approbation doté d'une connexion sécurisée.
+### 1. Créer la base privée
 
-## Sécurité, publication et limites
+1. Sur https://supabase.com/dashboard, créer un **nouveau projet distinct** intitulé `BACKSTAGE` (ne pas réutiliser la base de vos autres projets).
+2. Dans l'éditeur SQL du projet, exécuter `supabase/schema.sql`.
+3. Dans Authentication > Users, créer ou inviter **votre utilisateur rédacteur**. Utiliser idéalement la même adresse que celle associée à votre compte Supabase, ou configurer un serveur SMTP personnalisé ; l'e-mail par défaut de Supabase est limité aux adresses autorisées et à un très faible débit.
+4. Dans Authentication > Users, copier l'identifiant UUID de cet utilisateur.
+5. Dans SQL Editor, exécuter :
+   `insert into public.editorial_admins(user_id) values ('VOTRE-UUID-ICI');`
+6. Dans Authentication > URL Configuration, autoriser comme Redirect URL :
+   `https://kristouff59.github.io/media-festivals/admin/`.
+   Après migration de domaine, remplacer ou ajouter `https://votre-domaine/admin/`.
 
-- Les textes ne sont jamais publiés sans un commentaire de l'éditeur contenant exactement `PUBLIER`.
-- Seul le compte GitHub `Kristouff59` est autorisé par le workflow de décision.
-- Les nouvelles fiches sont créées uniquement par GitHub Actions ; leur contenu éditorial est scellé par une empreinte de contrôle pour éviter les modifications non souhaitées.
-- GitHub refuse de remplacer un article ou une fiche festival modifiée depuis la préparation.
-- Les sources officielles restent consultables, discrètement, sous les articles.
-- Le système accepte jusqu'à **cinq propositions simultanées**, pour éviter qu'un seul article non traité n'arrête la rédaction.
-- Une approbation fait un commit sur `main` et demande une reconstruction GitHub Pages. Un problème d'autorisation Pages ou de configuration peut empêcher la mise en ligne automatique ; le commentaire de résultat dans l'Issue signale cette difficulté.
-- Les vérifications documentaires automatisées réduisent les erreurs, mais ne sont pas infaillibles. L'éditeur garde la responsabilité de publication.
+### 2. Relier le site et le moteur de veille
 
-## Consommation de l'API
+Depuis Supabase, relever le **Project URL** et la **publishable API key**.
 
-- Secret GitHub : `OPENAI_API_KEY` (ne jamais le publier).
-- Modèle : `gpt-5.4-mini`, via Responses API, avec recherche Web OpenAI.
-- La veille RSS Google Actualités reste gratuite hors cas de secours OpenAI.
-- Le moteur traite au maximum deux sujets potentiels par exécution du radar ; il peut en proposer au plus un par exécution.
-- Le compte API OpenAI est distinct de ChatGPT Plus et peut être facturé.
-- Consulter https://platform.openai.com/usage et les limites de consommation.
+Dans `admin/config.js`, remplacer :
+- `SUPABASE_URL` : URL publique `https://<projet>.supabase.co`
+- `SUPABASE_PUBLISHABLE_KEY` : clé `sb_publishable_...` (ou ancienne clé `anon`).
 
-## Dépannage
+Ces deux paramètres sont **publics par nature**, mais l'accès aux brouillons est protégé par l'authentification et les politiques RLS. **Ne jamais placer la clé secrète dans un fichier du site.**
 
-- Workflow vert sans nouvelle Issue : aucun texte n'a satisfait les vérifications, ou le nombre maximal de propositions est atteint.
-- Une nouvelle Issue peut déclencher une alerte GitHub par assignation et mention ; la livraison par e-mail dépend de tes paramètres GitHub.
-- Tu peux lire un article complet depuis un navigateur ou l'application GitHub sur ton téléphone.
-- Si une décision échoue, consulter Actions → BACKSTAGE — publier ou refuser un article.
-- La veille ne génère plus de Pull Requests de suivi ; les données du radar sont archivées automatiquement.
+Dans les GitHub Actions **Secrets** du dépôt technique, ajouter :
+- `SUPABASE_URL` : même URL Supabase
+- `SUPABASE_SECRET_KEY` : clé serveur `sb_secret_...` (ou ancienne clé `service_role`).
+
+Dès que ces secrets existent, la veille dépose ses nouveaux brouillons dans Supabase au lieu de créer des Issues GitHub. La soumission est dédoublonnée et arrêtée lorsque cinq articles attendent une décision.
+
+### 3. Notifications e-mail
+
+Option recommandée : https://resend.com (formule gratuite sous réserve des quotas).
+
+Créer une clé de **simple envoi**, vérifier votre domaine d'envoi dans Resend, puis ajouter les Secrets GitHub :
+- `RESEND_API_KEY` : clé privée Resend
+- `BACKSTAGE_ALERT_EMAIL` : adresse où recevoir « Nouvel article à valider »
+- `BACKSTAGE_FROM_EMAIL` : adresse expéditrice autorisée par Resend (ex. `BACKSTAGE <redaction@votre-domaine.fr>`).
+
+Facultatif : dans **Settings → Secrets and variables → Actions → Variables**, ajouter `BACKSTAGE_SITE_URL` avec l'URL racine du magazine, pour que les e-mails pointent vers le futur domaine.
+
+Sans Resend configuré, le tableau de bord peut servir, **mais aucune notification par e-mail n'est envoyée**. Les anciennes alertes ChatGPT qui surveillent les Issues GitHub ne sont pas adaptées à la nouvelle base privée et devront être désactivées après migration.
+
+## Fonctionnement de la publication
+
+Le site récupère les articles publiés depuis Supabase avec une **clé publique et des politiques Row Level Security** : les brouillons en attente ou rejetés restent invisibles. L'approbation utilise une fonction SQL transactionnelle vérifiant l'identité du rédacteur.
+
+La commande **Publier** affecte immédiatement le statut `published`. Aucun jeton GitHub, aucun workflow de déploiement et aucun mot de passe serveur n'est nécessaire dans le navigateur. Le code du site reste versionné sur GitHub, mais le rédacteur n'a plus à y accéder.
+
+Le modèle OpenAI sert uniquement à rechercher et proposer une rédaction ; la publication ne nécessite pas de crédit OpenAI.
+
+## Sécurité et limites
+
+- Projet Supabase dédié et politiques RLS. Seuls les utilisateurs placés dans `editorial_admins` peuvent lire les brouillons et prendre une décision.
+- La clé serveur Supabase doit rester dans les Secrets du moteur technique ; seuls l'URL publique et la clé publishable sont visibles dans le navigateur.
+- Aucun brouillon n'est ajouté au HTML public avant approbation.
+- Le site lit actuellement les dernières 100 publications de Supabase en complément du catalogue statique.
+- La vérification automatique des sources réduit les risques, sans garantir l'exactitude absolue.
+- Un projet Supabase Free peut être mis en pause après une période d'inactivité. La partie statique du magazine reste visible, mais les nouveaux articles dynamiques ne le seront pas tant que la base n'est pas accessible.
+- Après changement de domaine, il faut reconfigurer les redirect URLs d'authentification et éventuellement le lien expéditeur des notifications. Le circuit de validation reste identique.
+
+## Vérification de mise en service
+
+1. Ouvrir `/admin/` puis se connecter.
+2. Déclencher le radar GitHub Actions une seule fois pour **tester la génération**.
+3. Vérifier qu'un article complet apparaît dans la rédaction, sans apparaître sur le site public.
+4. Cliquer **Publier cet article** et vérifier qu'il est visible sur la page publique.
+5. Faire un second essai avec **Refuser** pour confirmer qu'un brouillon rejeté reste privé.
+6. Vérifier la notification e-mail si Resend est configuré.
+
+**Important** : à ce stade, le code est prêt à connecter, mais l'intégration n'a pas pu être testée de bout en bout sans votre projet Supabase, votre utilisateur et les secrets de notification.
