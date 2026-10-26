@@ -1,3 +1,4 @@
+// @ts-nocheck
 // BACKSTAGE — moteur autonome. Aucun article n'est publié par ce service.
 // Seule la clé serveur Supabase peut invoquer cette fonction.
 // Déployer avec verify_jwt=false, auth appliquée ci-dessous.
@@ -128,16 +129,18 @@ function festivalChanges(f, source, url) {
   if (!f || typeof f.name !== "string" || !Array.isArray(f.lineup) ||
       !Number.isInteger(f.editionYear) || f.editionYear < 2026 || f.editionYear > 2035 ||
       !norm(source).includes(norm(f.name)) || !source.includes(String(f.editionYear))) return [];
+  const verifiedText = norm(source);
   const days = f.lineup.slice(0, 5).map(x => ({
     day: String(x.day || "").slice(0, 70),
     artists: (Array.isArray(x.artists) ? x.artists : []).filter(a => typeof a === "string" &&
-      a.length >= 3 && norm(source).includes(norm(a))).slice(0, 20),
-  })).filter(x => x.day.length > 4 && x.artists.length);
+      a.length >= 3 && verifiedText.includes(norm(a))).slice(0, 20),
+  })).filter(x => x.day.length > 4 && x.artists.length && verifiedText.includes(norm(x.day)));
   if (days.reduce((n,x) => n + x.artists.length, 0) < 2) return [];
   const row = {
-    name: f.name, city: String(f.city || "À confirmer").slice(0, 80),
+    name: f.name,
+    city: verifiedText.includes(norm(f.city)) && f.city ? String(f.city).slice(0, 80) : "À confirmer",
     country: String(f.country || "France").slice(0, 40),
-    dates: String(f.dates || "").slice(0, 70),
+    dates: f.dates && verifiedText.includes(norm(f.dates)) ? String(f.dates).slice(0, 70) : "",
     editionYear: f.editionYear, genres: "Musique live",
     lineup: days, lineupStatus: "Noms officiellement annoncés", url, code: "FEST",
   };
