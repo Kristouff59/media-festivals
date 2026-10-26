@@ -335,6 +335,20 @@ N'ajoute pas de villes, tarifs ou dates que la source ne confirme pas."""
     return write_site(article)
 
 def pending():
+    # Une rédaction Supabase branchée remplace les anciennes Issues publiques.
+    if os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SECRET_KEY"):
+        from supabase_queue import configured
+        if configured():
+            url=os.getenv("SUPABASE_URL").rstrip("/")
+            secret=os.getenv("SUPABASE_SECRET_KEY")
+            headers={"apikey":secret}
+            if not secret.startswith("sb_secret_"):
+                headers["Authorization"]="Bearer "+secret
+            r=S.get(url+"/rest/v1/editorial_drafts",
+                    params={"select":"id","status":"eq.pending","limit":"5"},
+                    headers=headers,timeout=20)
+            r.raise_for_status()
+            return len(r.json())>=5
     token=os.getenv("GITHUB_TOKEN")
     if not token:return False
     repo=os.getenv("GITHUB_REPOSITORY","Kristouff59/media-festivals")
