@@ -5,6 +5,11 @@ on:
     paths:
       - 'index.html'
       - 'admin/**'
+      - 'supabase/functions/**'
+      - 'supabase/migration-radar.sql'
+      - 'supabase/config.toml'
+      - 'supabase/schedule-radar.sql'
+      - 'tests/**'
       - 'supabase/schema.sql'
       - 'scripts/relecture.py'
       - 'scripts/supabase_queue.py'
@@ -37,6 +42,8 @@ jobs:
           console.log('Scripts extraits :',scripts.length);
           NODE
           node --check /tmp/backstage-scripts.js
+      - name: Tester le nouveau radar autonome, sans appeler les API
+        run: node tests/backstage-radar.test.mjs
       - name: Vérifier le JavaScript de la rédaction
         shell: bash
         run: |
