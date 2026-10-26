@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#111716">
+<title>BACKSTAGE — Rédaction</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,"Segoe UI",Arial,sans-serif;--bg:#101614;--card:#1c2420;--stroke:#35413a;--text:#f5f6ed;--muted:#b3c1b6;--accent:#d3f177}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:16px}
+a{color:var(--accent)}button,input{font:inherit}button{cursor:pointer}
+header{border-bottom:1px solid var(--stroke);padding:20px max(20px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;gap:15px;align-items:center}
+.brand{font-size:22px;letter-spacing:.06em;font-weight:900;text-decoration:none;color:var(--text)}
+main{max-width:1100px;margin:35px auto 100px;padding:0 20px}
+h1{font-size:clamp(30px,4vw,48px);line-height:1.05;margin:8px 0 12px;letter-spacing:-.03em}
+.eyebrow{font-size:12px;letter-spacing:.2em;font-weight:750;text-transform:uppercase;color:var(--accent)}
+.muted{color:var(--muted)}.panel{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:25px}
+.pill{font-size:12px;border-radius:30px;padding:6px 10px;border:1px solid var(--stroke);display:inline-block;color:var(--muted)}
+button{background:var(--accent);color:#151913;border:0;border-radius:8px;padding:13px 16px;font-weight:750}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.secondary{background:transparent;color:var(--text);border:1px solid var(--stroke)}
+button.danger{background:#422a2a;color:#fce6e6}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.formfield{display:block;margin:20px 0 12px;color:var(--muted)}
+input{display:block;width:100%;max-width:480px;border-radius:8px;border:1px solid var(--stroke);padding:13px;background:#0d100f;color:white}
+#alert{margin:20px 0;min-height:15px}#alert:not(:empty){padding:14px;border:1px solid var(--stroke);border-radius:8px}
+#layout{display:grid;grid-template-columns:minmax(245px,320px) minmax(0,1fr);gap:24px;margin-top:28px}
+#drafts{display:flex;flex-direction:column;gap:10px}
+.draft{display:block;width:100%;text-align:left;background:var(--card);color:var(--text);border:1px solid var(--stroke);padding:15px;border-radius:10px}
+.draft.active{border-color:var(--accent);background:#273126}
+.draft strong{display:block;line-height:1.35;margin:9px 0;font-size:15px}
+.draft .muted{font-size:12px}
+.article{max-width:720px}.article h2{font-size:clamp(27px,3vw,38px);line-height:1.15;letter-spacing:-.028em}
+.article h3{font-size:21px;margin-top:40px}
+.article p{font:18px/1.75 Georgia,serif;color:#eeefea}
+.article .deck{font:19px/1.55 Inter,"Segoe UI",sans-serif;color:#e0e5dc}
+.article .bodyparagraph{margin:22px 0}
+.source-list{padding-left:22px;line-height:1.9}
+.actions{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--stroke);padding:16px 0;margin-top:30px}
+.empty{color:var(--muted);padding:25px 0}
+@media(max-width:750px){#layout{grid-template-columns:1fr}header{padding:18px}main{margin-top:25px}.article p{font-size:17px}}
+</style>
+</head>
+<body>
+<header><a class="brand" href="../">BACKSTAGE<span style="color:var(--accent)">.</span></a><div class="row"><span class="pill">ESPACE RÉDACTION</span><button id="logout" class="secondary" hidden>Déconnexion</button></div></header>
+<main>
+<p class="eyebrow">Votre rédaction, votre décision</p>
+<h1>Articles à valider.</h1>
+<p class="muted">Lisez chaque article complet. Vous seul décidez ce qui paraît sur BACKSTAGE.</p>
+<p id="alert" role="status" aria-live="polite"></p>
+<section id="setup" class="panel" hidden>
+<h2>Configuration de la rédaction nécessaire</h2>
+<p>Le tableau de bord a été installé sur BACKSTAGE, mais la base de données privée n'est pas encore reliée. Aucun mot de passe ni article n'est exposé sur cette page.</p>
+<p class="muted">Il faut créer un projet Supabase dédié, installer le schéma SQL et renseigner la configuration publique de ce tableau de bord.</p>
+</section>
+<section id="login" class="panel" hidden>
+<h2>Connexion privée</h2>
+<p>Un lien de connexion à usage unique sera envoyé à votre adresse autorisée.</p>
+<label class="formfield" for="email">Adresse e-mail de rédaction</label>
+<input type="email" id="email" autocomplete="email" placeholder="vous@votredomaine.fr">
+<p><button id="send">Recevoir mon lien de connexion</button></p>
+</section>
+<section id="workspace" hidden>
+<div class="row"><span id="counter" class="pill">0 article en attente</span><button class="secondary" id="refresh">Actualiser</button></div>
+<div id="layout"><div id="drafts"></div><article id="preview" class="panel article"><p class="empty">Sélectionnez un article pour le lire.</p></article></div>
+</section>
+</main>
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.58.0';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
+const $=id=>document.getElementById(id);
+const setMessage=(message)=>{$('alert').textContent=message||''};
+const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const valid=SUPABASE_URL.startsWith('https://')&&SUPABASE_PUBLISHABLE_KEY.length>24&&!SUPABASE_URL.includes('VOTRE-PROJET');
+let client,drafts=[],selected=null,busy=false;
+function setVisible(id,on){$(id).hidden=!on}
+function statusName(v){return({pending:'À lire',approved:'Publication demandée',published:'En ligne',rejected:'Refusé'})[v]||v}
+function documentText(a){
+let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>';
+for(const p of a.body||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';
+for(const group of a.sections||[]){out+='<h3>'+escapeHTML(group.title)+'</h3>';for(const p of group.paragraphs||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>'}
+return out;
+}
+function showPreview(){
+const row=drafts.find(x=>x.id===selected);
+if(!row){$('preview').innerHTML='<p class="empty">Sélectionnez un article pour le lire.</p>';return}
+const data=row.payload||{},a=data.article||{},fests=data.festivals||[];
+let html=documentText(a);
+if(fests.length){html+='<h3>Fiches festivals mises à jour</h3>';for(const change of fests){
+ const f=change.new||{};html+='<p><strong>'+escapeHTML(f.name)+'</strong> · '+escapeHTML(f.dates)+'</p>';
+ for(const day of f.lineup||[])html+='<p>'+escapeHTML(day.day)+' : '+escapeHTML((day.artists||[]).join(' · '))+'</p>';
+}}
+html+='<h3>Sources</h3><ul class="source-list">';
+for(const source of a.sources||[]){if(/^https:\/\/[^\s"'<>]+$/.test(source.url))html+='<li><a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(source.url)+'">'+escapeHTML(source.label)+'</a></li>'}
+html+='</ul>';
+if(row.status==='pending')html+='<div class="actions row"><button id="approve">Publier cet article</button><button class="danger" id="reject">Refuser</button></div>';
+else html+='<p class="pill">'+escapeHTML(statusName(row.status))+'</p>';
+$('preview').innerHTML=html;
+$('approve')?.addEventListener('click',()=>decide(row,'approved'));
+$('reject')?.addEventListener('click',()=>decide(row,'rejected'));
+}
+function showList(){
+$('counter').textContent=drafts.filter(x=>x.status==='pending').length+' article(s) à valider';
+$('drafts').replaceChildren();
+for(const d of drafts){const b=document.createElement('button');b.className='draft'+(selected===d.id?' active':'');b.innerHTML='<span class="pill">'+escapeHTML(statusName(d.status))+'</span><strong>'+escapeHTML(d.title)+'</strong><span class="muted">'+escapeHTML(new Date(d.created_at).toLocaleDateString('fr-FR'))+'</span>';b.addEventListener('click',()=>{selected=d.id;showList();showPreview()});$('drafts').append(b)}
+if(!drafts.length)$('drafts').innerHTML='<p class="empty">Aucun article en attente. Le radar musical continue sa veille.</p>';
+showPreview();
+}
+async function load(){
+const {data,error}=await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload').order('created_at',{ascending:false}).limit(60);
+if(error){setMessage('Lecture impossible : '+error.message);return}
+drafts=data||[];
+if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
+showList();
+}
+async function decide(row,status){
+if(busy||row.status!=='pending')return;
+const question=status==='approved'?'Confirmer la publication de cet article ?':'Refuser cet article sans le publier ?';
+if(!confirm(question))return;
+busy=true;$('approve').disabled=true;$('reject').disabled=true;setMessage('Enregistrement de votre décision…');
+try{
+const {error}=await client.rpc('decide_editorial_draft',{p_draft_id:row.id,p_decision:status});
+if(error)throw error;
+setMessage(status==='approved'?'Publication demandée. L’article paraîtra après le prochain passage du système de publication.':'Article refusé : il ne sera pas publié.');
+await load();
+}catch(err){setMessage('Décision non enregistrée : '+err.message);showPreview()}
+finally{busy=false}
+}
+async function init(){
+if(!valid){setVisible('setup',true);return}
+client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+$('send').addEventListener('click',async()=>{
+ const email=$('email').value.trim();if(!email)return setMessage('Saisissez votre adresse e-mail.');
+ $('send').disabled=true;
+ const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
+ $('send').disabled=false;
+ setMessage(error?'Connexion impossible : '+error.message:'Si votre adresse est autorisée, un e-mail de connexion vous a été envoyé.');
+});
+$('logout').addEventListener('click',async()=>{await client.auth.signOut();location.reload()});
+$('refresh').addEventListener('click',load);
+const {data:{session}}=await client.auth.getSession();
+setVisible('login',!session);setVisible('workspace',!!session);setVisible('logout',!!session);
+if(session)await load();
+client.auth.onAuthStateChange((_event,current)=>{
+ setVisible('login',!current);setVisible('workspace',!!current);setVisible('logout',!!current);
+ if(current)void load();
+});
+}
+init().catch(e=>setMessage('Erreur de connexion : '+e.message));
+</script>
+</body>
+</html>
