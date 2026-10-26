@@ -5,6 +5,8 @@ create table if not exists public.editorial_admins (
   created_at timestamptz not null default now()
 );
 alter table public.editorial_admins enable row level security;
+revoke all on public.editorial_admins from anon,authenticated;
+grant select on public.editorial_admins to authenticated;
 drop policy if exists editorial_admin_self on public.editorial_admins;
 create policy editorial_admin_self on public.editorial_admins
   for select to authenticated using ((select auth.uid()) = user_id);
@@ -18,7 +20,7 @@ create table if not exists public.editorial_drafts (
   excerpt text,
   payload jsonb not null,
   status text not null default 'pending'
-    check (status in ('pending','approved','rejected','published')),
+    check (status in ('pending','rejected','published')),
   created_at timestamptz not null default now(),
   decided_at timestamptz,
   published_at timestamptz
@@ -26,12 +28,17 @@ create table if not exists public.editorial_drafts (
 create index if not exists idx_editorial_drafts_status_date
   on public.editorial_drafts(status, created_at desc);
 alter table public.editorial_drafts enable row level security;
+revoke all on public.editorial_drafts from anon,authenticated;
+grant select on public.editorial_drafts to anon,authenticated;
 drop policy if exists editorial_admin_read on public.editorial_drafts;
 create policy editorial_admin_read on public.editorial_drafts
   for select to authenticated using (
     exists (select 1 from public.editorial_admins a
             where a.user_id = (select auth.uid()))
   );
+drop policy if exists editorial_published_public on public.editorial_drafts;
+create policy editorial_published_public on public.editorial_drafts
+  for select to anon,authenticated using (status = 'published');
 -- Aucune écriture directe possible depuis le navigateur.
 -- Insertion et confirmation de publication : scripts serveur (clé secrète).
 -- Approbation : fonction SQL transactionnelle ci-dessous.
@@ -54,7 +61,7 @@ begin
   ) then
     raise exception 'Accès rédaction refusé';
   end if;
-  if p_decision not in ('approved','rejected') then
+  if p_decision not in ('published','rejected') then
     raise exception 'Décision incorrecte';
   end if;
   select status into v_status
@@ -68,7 +75,8 @@ begin
     raise exception 'Article déjà traité (%).', v_status;
   end if;
   update public.editorial_drafts
-  set status = p_decision, decided_at = now()
+  set status = p_decision, decided_at = now(),
+      published_at = case when p_decision = 'published' then now() else null end
   where id = p_draft_id;
   return p_decision;
 end;
