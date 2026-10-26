@@ -66,7 +66,7 @@ input{display:block;width:100%;max-width:480px;border-radius:8px;border:1px soli
 </form>
 </section>
 <section id="workspace" hidden>
-<div class="row"><span id="counter" class="pill">0 article en attente</span><button class="secondary" id="refresh">Actualiser</button></div>
+<div class="row"><span id="counter" class="pill">0 article en attente</span><span id="radar-state" class="pill">Veille Supabase non encore activée</span><button class="secondary" id="refresh">Actualiser</button></div>
 <div id="layout"><div id="drafts"></div><article id="preview" class="panel article"><p class="empty">Sélectionnez un article pour le lire.</p></article></div>
 </section>
 </main>
@@ -115,6 +115,15 @@ async function load(){
 const {data,error}=await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload').order('created_at',{ascending:false}).limit(60);
 if(error){setMessage('Lecture impossible : '+error.message);return}
 drafts=data||[];
+const radar=await client.from('editorial_radar_runs').select('status,detail,started_at')
+  .order('started_at',{ascending:false}).limit(1);
+if(!radar.error && radar.data?.length){
+  const run=radar.data[0];
+  const date=new Date(run.started_at).toLocaleString('fr-FR');
+  $('radar-state').textContent='Dernière veille : '+date+' ('+
+    (run.status==='completed'?'terminée':run.status==='running'?'en cours':'échec')+')';
+  $('radar-state').title=run.detail||'';
+}else $('radar-state').textContent='Veille Supabase non encore activée';
 if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
 showList();
 }
