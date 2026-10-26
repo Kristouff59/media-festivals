@@ -56,10 +56,14 @@ input{display:block;width:100%;max-width:480px;border-radius:8px;border:1px soli
 </section>
 <section id="login" class="panel" hidden>
 <h2>Connexion privée</h2>
-<p>Un lien de connexion à usage unique sera envoyé à votre adresse autorisée.</p>
+<p>Connectez-vous avec le compte rédacteur créé dans Supabase. Aucun mot de passe n'est transmis à GitHub.</p>
+<form id="login-form">
 <label class="formfield" for="email">Adresse e-mail de rédaction</label>
-<input type="email" id="email" autocomplete="email" placeholder="vous@votredomaine.fr">
-<p><button id="send">Recevoir mon lien de connexion</button></p>
+<input type="email" id="email" autocomplete="email" required placeholder="vous@votredomaine.fr">
+<label class="formfield" for="password">Mot de passe</label>
+<input type="password" id="password" autocomplete="current-password" required minlength="8" placeholder="Votre mot de passe">
+<p><button id="send" type="submit">Se connecter</button></p>
+</form>
 </section>
 <section id="workspace" hidden>
 <div class="row"><span id="counter" class="pill">0 article en attente</span><button class="secondary" id="refresh">Actualiser</button></div>
@@ -130,12 +134,22 @@ finally{busy=false}
 async function init(){
 if(!valid){setVisible('setup',true);return}
 client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-$('send').addEventListener('click',async()=>{
- const email=$('email').value.trim();if(!email)return setMessage('Saisissez votre adresse e-mail.');
+$('login-form').addEventListener('submit',async(e)=>{
+ e.preventDefault();
+ const email=$('email').value.trim();
+ const password=$('password').value;
+ if(!email||!password)return setMessage('Renseignez votre e-mail et votre mot de passe.');
  $('send').disabled=true;
- const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
- $('send').disabled=false;
- setMessage(error?'Connexion impossible : '+error.message:'Si votre adresse est autorisée, un e-mail de connexion vous a été envoyé.');
+ try{
+   const {error}=await client.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   $('password').value='';
+   setMessage('');
+ }catch(error){
+   setMessage('Connexion impossible : '+error.message);
+ }finally{
+   $('send').disabled=false;
+ }
 });
 $('logout').addEventListener('click',async()=>{await client.auth.signOut();location.reload()});
 $('refresh').addEventListener('click',load);
