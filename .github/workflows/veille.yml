@@ -1,17 +1,6 @@
 name: BACKSTAGE — radar musique live
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'config/sources.json'
-      - 'scripts/veille.py'
-      - 'scripts/preparer_articles.py'
-      - 'scripts/proposer_publication.py'
-      - 'scripts/relecture.py'
-      - 'scripts/supabase_queue.py'
-      - 'scripts/decision_publication.py'
-      - '.github/workflows/veille.yml'
   schedule:
     - cron: '17 7,18 * * *'
 concurrency:
