@@ -31,7 +31,8 @@ def send_notification(title, identifier):
     api = os.getenv("RESEND_API_KEY", "").strip()
     recipient = os.getenv("BACKSTAGE_ALERT_EMAIL", "").strip()
     sender = os.getenv("BACKSTAGE_FROM_EMAIL", "").strip()
-    site = os.getenv("BACKSTAGE_SITE_URL", "https://kristouff59.github.io/media-festivals").rstrip("/")
+    site = (os.getenv("BACKSTAGE_SITE_URL") or
+            "https://kristouff59.github.io/media-festivals").rstrip("/")
     if not (api and recipient and sender):
         print("Alerte e-mail non configurée (RESEND_API_KEY, BACKSTAGE_ALERT_EMAIL, BACKSTAGE_FROM_EMAIL).")
         return
