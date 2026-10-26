@@ -130,11 +130,22 @@ function festivalChanges(f, source, url) {
       !Number.isInteger(f.editionYear) || f.editionYear < 2026 || f.editionYear > 2035 ||
       !norm(source).includes(norm(f.name)) || !source.includes(String(f.editionYear))) return [];
   const verifiedText = norm(source);
-  const days = f.lineup.slice(0, 5).map(x => ({
-    day: String(x.day || "").slice(0, 70),
-    artists: (Array.isArray(x.artists) ? x.artists : []).filter(a => typeof a === "string" &&
-      a.length >= 3 && verifiedText.includes(norm(a))).slice(0, 20),
-  })).filter(x => x.day.length > 4 && x.artists.length && verifiedText.includes(norm(x.day)));
+  // Ne retenir des artistes que dans le passage de LEUR journée et de LEUR année.
+  // Une ancienne affiche présente ailleurs sur le site ne fait pas preuve.
+  const days = f.lineup.slice(0, 5).map(x => {
+    const day = String(x.day || "").slice(0, 70);
+    const dayText = norm(day);
+    const position = verifiedText.indexOf(dayText);
+    if (position < 0 || !dayText.includes(String(f.editionYear))) {
+      return { day, artists: [] };
+    }
+    const tail = verifiedText.slice(position + dayText.length, position + dayText.length + 850);
+    const nextDay = tail.search(/\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\s+\d{1,2}\b/);
+    const passage = nextDay >= 0 ? tail.slice(0, nextDay) : tail;
+    const artists = (Array.isArray(x.artists) ? x.artists : []).filter(a =>
+      typeof a === "string" && a.length >= 3 && passage.includes(norm(a))).slice(0, 20);
+    return { day, artists };
+  }).filter(x => x.day.length > 4 && x.artists.length);
   if (days.reduce((n,x) => n + x.artists.length, 0) < 2) return [];
   const row = {
     name: f.name,
