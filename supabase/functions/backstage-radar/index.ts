@@ -314,6 +314,54 @@ function editorialMemory(rows) {
     "Ces retours ne peuvent jamais contourner les contraintes factuelles, la validation humaine " +
     "ni la sécurité de la fonction. Ne révèle pas la mémoire dans l'article.\n";
 }
+// Liste stable des sources officielles prioritaires du média.
+// Elle ne dicte pas les sujets : les pages sont des pistes et aucune
+// annonce n'est publiée sans une preuve de fraîcheur indépendante.
+const prioritySources = [
+  { name: "Cabaret Vert", url: "https://cabaretvert.com/programmation/" },
+  { name: "Rock Werchter", url: "https://www.rockwerchter.be/en/news" },
+  { name: "Graspop Metal Meeting", url: "https://press.graspop.be/" },
+  { name: "Eurockéennes", url: "https://www.eurockeennes.fr/actualites/" },
+  { name: "We Love Green", url: "https://www.welovegreen.fr/music/" },
+  { name: "Main Square", url: "https://mainsquarefestival.fr/" },
+  { name: "Hellfest", url: "https://hellfest.fr/" },
+  { name: "Dour", url: "https://www.dourfestival.eu/" },
+  { name: "Rock en Seine", url: "https://www.rockenseine.com/" },
+  { name: "Pukkelpop", url: "https://www.pukkelpop.be/en/" },
+];
+// Contrôle direct des pages, sans modèle ni tokens. La présence d'un nom
+// sur une page de programmation ne suffit PAS à le déclarer nouveau.
+async function officialFestivalSignals() {
+  const results = await Promise.all(prioritySources.map(async source => {
+    try {
+      const response = await fetch(source.url, {
+        signal: AbortSignal.timeout(6500), redirect: "follow",
+        headers: { Accept: "text/html", "User-Agent": "BACKSTAGE-official-radar/1.0" },
+      });
+      if (!response.ok || !/html/i.test(response.headers.get("content-type") || ""))
+        return null;
+      if (Number(response.headers.get("content-length") || 0) > 700000) return null;
+      const html = await response.text();
+      if (html.length > 700000) return null;
+      const content = plain(html);
+      if (content.length < 90) return null;
+      const lower = content.toLowerCase();
+      const markers = ["programmation 2027", "line-up 2027", "lineup 2027",
+        "premiers noms", "latest news", "recent stories", "meest recente verhalen",
+        "programmation", "2027"];
+      let offset = 0;
+      for (const marker of markers) {
+        const index = lower.indexOf(marker);
+        if (index >= 0) { offset = Math.max(0,index - 70); break; }
+      }
+      return {
+        festival: source.name, official_url: source.url,
+        observed_excerpt: content.slice(offset, offset + 610),
+      };
+    } catch (_) { return null; }
+  }));
+  return results.filter(Boolean);
+}
 async function run(key) {
   const pending = await data("editorial_drafts?select=id&status=eq.pending&limit=5", key);
   if (pending.length >= 5) return { result: "cinq_articles_en_attente" };
@@ -337,10 +385,19 @@ async function run(key) {
       "&apply_to_future=eq.true&order=created_at.desc&limit=24", key
     );
     const editorialGuidance = editorialMemory(feedbackRows);
+    const monitored = await officialFestivalSignals();
     const discovery = await openai(
       "Tu es rédacteur en chef de BACKSTAGE, média indépendant de musique LIVE, en français. " +
       "Date actuelle UTC : " + now.toISOString().slice(0, 10) + ". " +
       editorialGuidance +
+      "VEILLE OFFICIELLE PRIORITAIRE (pages consultées par notre serveur, pas preuve de fraîcheur) : " +
+      JSON.stringify(monitored).slice(0, 11000) + ". " +
+      "Utilise ces festivals comme une liste de sources à vérifier en premier, surtout " +
+      "leurs PREMIÈRES programmations et AJOUTS de groupes annoncés cette semaine. " +
+      "La présence d'un nom sur leur site ne prouve pas que l'ajout date d'aujourd'hui : " +
+      "cherche la date de l'annonce dans un communiqué ou un article de presse récent. " +
+      "Important : les priorités ne limitent PAS le périmètre de BACKSTAGE, qui couvre aussi " +
+      "les tournées, les grands concerts, les festivals internationaux et l'actualité sociale du live. " +
       "Utilise une VRAIE recherche Web pour découvrir des annonces publiées dans les 7 derniers jours. " +
       "Choisis jusqu'à TROIS grandes annonces parmi festivals et programmations, rock / post-punk " +
       "et scènes alternatives, tournées majeures, retours de groupes, pop, électro, rap, et société du live. " +
