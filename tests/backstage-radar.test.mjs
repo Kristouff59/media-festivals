@@ -17,6 +17,7 @@ assert.match(feedbackMigration, /status = 'rejected'/i);
 // ON CONFLICT (topic_key) exige un index unique non partiel pour l'upsert PostgREST.
 assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
+let emptyDiscovery = false;
 const prompts = [];
 const editorialReturns = [
   { article_title:"Concert XYZ", category:"artiste",
@@ -74,7 +75,7 @@ async function fakeFetch(url, options = {}) {
     if (params.tools) return answer({ status: "completed", output: [
       { type: "web_search_call" },
       { type: "message", content: [{ type: "output_text",
-        text: JSON.stringify({ candidates: [{
+        text: JSON.stringify({ candidates: emptyDiscovery ? [] : [{
           topic: "Grand Festival 2027 annonce une première programmation",
           topic_key: "grand-festival-programmation-2027",
           why_now: "Annonce officielle cette semaine",
@@ -166,5 +167,22 @@ const missingQuote = await handler(new Request("https://project.supabase.co/func
 assert.equal(missingQuote.status, 200);
 assert.equal((await missingQuote.json()).rejections[0].reason, "citations_non_retrouvees");
 assert.equal(openaiCalls, 1, "Une citation manquante empêche la rédaction");
+
+// Une recherche OpenAI sans piste ne doit pas déclencher de rédaction
+// et doit être clairement distinguée des sources vérifiées puis rejetées.
+emptyDiscovery = true;
+openaiCalls = 0;
+insertedDraft = null;
+const noCandidates = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
+assert.equal(noCandidates.status, 200);
+const emptyReport = await noCandidates.json();
+assert.equal(emptyReport.result, "aucune_source_officielle_verifiee");
+assert.equal(emptyReport.candidates_found, 0);
+assert.equal(emptyReport.checked, 0);
+assert.equal(emptyReport.discovery_status, "no_candidates_returned");
+assert.equal(emptyReport.rejections.length, 0);
+assert.equal(openaiCalls, 1, "Pas de rédaction payante sans sujet");
+assert.equal(insertedDraft, null, "Pas de création d'article à partir d'une recherche vide");
 
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
