@@ -10,6 +10,13 @@ const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
 // ON CONFLICT (topic_key) exige un index unique non partiel pour l'upsert PostgREST.
 assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
+const prompts = [];
+const editorialReturns = [
+  { article_title:"Concert XYZ", category:"artiste",
+    reason:"Je préfère les nouvelles annonces post-punk à ce groupe de pop.",apply_to_future:true },
+  { article_title:"Autre concert", category:"style",
+    reason:"Ce rejet est ponctuel, sans incidence éditoriale.",apply_to_future:false },
+];
 const db = [];
 let publicationDate = new Date(Date.now() - 86400000).toISOString();
 let sourceHTML = '<html><head><meta property="article:published_time" content="' +
@@ -41,6 +48,7 @@ async function fakeFetch(url, options = {}) {
   if (address.includes("/rest/v1/editorial_drafts?select=id&status=eq.pending")) return answer([]);
   if (address.includes("/rest/v1/editorial_radar_runs?on_conflict=slot")) return answer([{ slot: "2026-10-26-matin" }], 201);
   if (address.includes("/rest/v1/editorial_drafts?select=topic_key")) return answer([]);
+  if (address.includes("/rest/v1/editorial_feedback?select=")) return answer(editorialReturns);
   if (address.includes("/rest/v1/editorial_drafts?on_conflict=topic_key")) {
     insertedDraft = JSON.parse(options.body)[0];
     return answer([{ id: "test" }], 201);
@@ -54,6 +62,7 @@ async function fakeFetch(url, options = {}) {
   });
   if (address === "https://api.openai.com/v1/responses") {
     const params = JSON.parse(options.body);
+    prompts.push(params.input);
     openaiCalls++;
     if (params.tools) return answer({ status: "completed", output: [
       { type: "web_search_call" },
@@ -98,9 +107,21 @@ const result = await trigger.json();
 assert.equal(trigger.status, 200, JSON.stringify(result));
 assert.equal(result.result, "article_a_valider");
 assert.equal(openaiCalls, 2, "Une recherche et une rédaction, pas plus");
+assert.ok(prompts[0].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la découverte");
+assert.ok(prompts[1].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la rédaction");
+assert.ok(!prompts[0].includes("Ce rejet est ponctuel"), "Un refus ponctuel n'est pas transmis");
+assert.ok(!prompts[1].includes("Ce rejet est ponctuel"), "Le refus ponctuel est aussi absent de la rédaction");
 assert.equal(insertedDraft.status, "pending", "Aucune publication automatique");
 assert.equal(insertedDraft.payload.article.sources[0].url, "https://grandfestival.example/programme");
 assert.equal(runUpdates, 1);
+// Aucun feedback n'est envoyé si le rédacteur choisit de ne pas l'appliquer.
+editorialReturns[0].apply_to_future=false;
+prompts.length=0;
+const noMemory = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
+assert.equal(noMemory.status, 200);
+assert.ok(!prompts.some(p=>p.includes("nouvelles annonces post-punk")),
+  "L'avis décoché est exclu même après un précédent usage");
 // Une annonce ancienne ou sans date de publication doit être écartée.
 const recentMeta = '<meta property="article:published_time" content="' + publicationDate + '">';
 sourceHTML = sourceHTML.replace(recentMeta,
