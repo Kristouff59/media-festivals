@@ -219,6 +219,45 @@ Déployer `supabase/functions/backstage-radar/index.ts` à nouveau dans
 Supabase pour bénéficier de cette modification : GitHub ne le fait pas
 automatiquement.
 
+## Journal privé des appels OpenAI (sans tokens supplémentaires)
+
+La fonction journalise maintenant **les appels OpenAI déjà effectués** :
+requête envoyée, texte de réponse, modèle, jetons d'entrée et de sortie,
+nombre de recherches Web, durée, identifiant de réponse et erreurs.
+Le nombre de requêtes OpenAI est **inchangé** : la collecte est faite
+avec des écritures dans Supabase, non avec un deuxième appel au modèle.
+
+La requête et la réponse sont plafonnées à 16 000 caractères chacune.
+Ne sont jamais stockés les en-têtes d'authentification, la clé Supabase
+ni la clé OpenAI. En revanche, les consignes internes et les préférences
+éditoriales intégrées aux requêtes peuvent figurer dans le journal :
+**consultation réservée aux administrateurs de rédaction par RLS**.
+Le journal est automatiquement purgé au bout de 30 jours (lors de
+l'insertion de nouveaux appels).
+
+### Activation, dans cet ordre
+
+1. **Supabase → SQL Editor** : copier et exécuter entièrement
+   [`supabase/migration-ai-logs.sql`](supabase/migration-ai-logs.sql).
+   Cette migration crée `editorial_ai_logs`, limite sa consultation
+   aux administrateurs et règle la purge à 30 jours. Elle ne modifie
+   aucun article existant.
+2. **Supabase → Edge Functions → backstage-radar** : remplacer le
+   code par la version de
+   [`supabase/functions/backstage-radar/index.ts`](supabase/functions/backstage-radar/index.ts)
+   sur la branche principale GitHub puis **Deploy updates**.
+   Aucun nouveau secret n'est nécessaire.
+3. Recharger le tableau de bord privé
+   [`/admin/`](https://kristouff59.github.io/media-festivals/admin/) :
+   sous l'état de la dernière veille, le panneau
+   **« Journal privé des appels OpenAI »** affiche les 30 appels les plus
+   récents. Il est vide jusqu'au prochain lancement réel du radar.
+
+L'affichage du journal ne déclenche aucune nouvelle requête OpenAI.
+Une panne de son écriture ne doit ni générer d'appel supplémentaire,
+ni empêcher la validation des sources et la création des brouillons.
+Les anciennes veilles ne peuvent pas être reconstruites rétroactivement.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
