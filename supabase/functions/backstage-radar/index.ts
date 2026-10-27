@@ -334,7 +334,10 @@ async function run(key) {
         candidates_found: discovery.candidates.length,
         rejections: rejectionDetails };
       // Garder aussi un résumé exploitable par l'administration.
-      outcome = JSON.stringify(report).slice(0, 440);
+      outcome = ("Aucune source vérifiée : " + rejectionDetails
+        .map(x => x.topic.slice(0, 75) + " (" + x.reason + ")").join(" ; "))
+        .slice(0, 440);
+      if (!rejectionDetails.length) outcome = "Aucune source vérifiée : OpenAI n'a proposé aucun sujet.";
       return report;
     }
     const { news, proof } = chosen;
