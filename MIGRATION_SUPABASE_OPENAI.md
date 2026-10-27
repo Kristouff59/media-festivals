@@ -193,6 +193,32 @@ n'est trouvée.
 **Cette amélioration nécessite un redéploiement de l'Edge Function** :
 il ne suffit pas de mettre à jour GitHub.
 
+## Élargissement de la lecture des dates officielles (27 octobre 2026)
+
+Cas réel : OpenAI a découvert l'annonce de la tournée U2
+« The Greatest Show on Earth » sur le site officiel, mais le contrôle
+avait renvoyé `date_publication_absente`. Or l'annonce initiale
+a été publiée le **15 octobre 2026**, soit plus de sept jours avant
+la veille du 27 octobre : le diagnostic attendu était
+`annonce_trop_ancienne`, **sans publication automatique**.
+
+Le radar lit maintenant, en plus des métadonnées d'article et des
+dates structurées, certaines dates publiées **dans l'en-tête de
+l'article officiel à côté de son temps de lecture** (exemple :
+`15 OCTOBER 2026 1 MIN READ`). Il ne considère jamais comme
+preuve de fraîcheur une date de concert isolée. Si la date reste
+inaccessible, le sujet est toujours écarté.
+
+Les tests automatisés couvrent maintenant quatre cas supplémentaires :
+date visible récente, date visible ancienne, date de concert seule,
+et ancienne métadonnée combinée à une date visible récente.
+La vérification doit rester stricte : une amélioration de l'extraction
+de date n'autorise pas une annonce obsolète à être publiée.
+
+Déployer `supabase/functions/backstage-radar/index.ts` à nouveau dans
+Supabase pour bénéficier de cette modification : GitHub ne le fait pas
+automatiquement.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
