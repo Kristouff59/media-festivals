@@ -47,12 +47,14 @@ function parseOutput(text) {
 async function openai(prompt, web) {
   const req = {
     model, input: prompt, store: false,
-    reasoning: { effort: "low" }, max_output_tokens: web ? 2400 : 4500,
+    reasoning: { effort: "low" }, max_output_tokens: web ? 3000 : 4500,
   };
   if (web) {
     req.tools = [{ type: "web_search", search_context_size: "medium" }];
     req.tool_choice = "required";
-    req.max_tool_calls = 2;
+    // Trois recherches maximum pour couvrir plusieurs univers musicaux.
+    // Coût API encadré : un seul appel de découverte puis un appel de rédaction.
+    req.max_tool_calls = 3;
   } else req.text = { format: { type: "json_object" } };
   const r = await fetch(api, {
     method: "POST", signal: AbortSignal.timeout(50000),
@@ -286,27 +288,38 @@ async function run(key) {
       "France et pays voisins bienvenus, mais ne te limite pas à de petits événements locaux. " +
       "Ne propose pas de liste d'agendas génériques, de rumeurs, ni une annonce déjà connue : " +
       JSON.stringify(previousTitles.slice(0, 45)) + ". " +
-      "Exige une page officielle d'annonce datée des 7 derniers jours (métadonnées datePublished). " +
-      "Une page de billetterie pour un événement imminent n'est PAS une nouvelle annonce. " +
-      "Si aucune preuve de fraîcheur n'existe, écarte le sujet. " +
-      "Trouve pour chaque sujet une page de source PRIMAIRE accessible en HTTPS : " +
-      "festival, artiste, salle officielle, producteur ou organisateur. " +
-      "Fournis deux citations assez longues copiées EXACTEMENT de la page officielle. " +
-      "Ne fabrique jamais une citation. Si rien n'est suffisamment confirmé, candidats vides. " +
-      "Réponds uniquement par un objet JSON SANS Markdown : " +
-      '{"candidates":[{"topic":"Annonce précise de cette semaine",'+
+      "La tâche actuelle est de DÉCOUVRIR des PISTES, pas encore de les valider. " +
+      "Effectue jusqu'à TROIS recherches ciblées complémentaires : annonces de festivals, " +
+      "nouvelles tournées rock/indé/post-punk, grands concerts pop/rap/électro et enjeux du live. " +
+      "Une annonce publiée cette semaine peut concerner un événement prévu dans plusieurs mois. " +
+      "Ne confonds jamais date du concert et date de la première annonce. " +
+      "Cherche des articles d'actualité récents y compris dans la presse pour IDENTIFIER les pistes ; " +
+      "pour chaque piste donne ensuite la meilleure page PRIMAIRE correspondante " +
+      "(artiste, festival, producteur ou organisateur), si elle existe. " +
+      "N'affirme pas qu'une date ou une citation est vérifiée si tu ne l'as pas observée. " +
+      "La présence d'un champ datePublished dans la page officielle sera vérifiée ENSUITE par notre programme : " +
+      "tu n'as PAS à garantir toi-même cette métadonnée, ni à éliminer une piste faute de la voir. " +
+      "De même, les citations exactes seront contrôlées ensuite : indique au moins UNE phrase " +
+      "littéralement observée sur la page officielle dans quotes, ou quotes:[] si la citation " +
+      "est introuvable. Il vaut mieux rendre une piste imparfaite que renvoyer une liste vide " +
+      "par excès de prudence. N'invente jamais une URL ni un extrait. " +
+      "Une page de billetterie ancienne ne prouve pas une annonce nouvelle. " +
+      "RÉPONDS UNIQUEMENT EN JSON, sans Markdown : " +
+      '{"candidates":[{"topic":"Annonce précise récente",'+
       '"topic_key":"sujet-evenement-annee-cle-stable",'+
-      '"why_now":"Ce qui vient réellement d’être annoncé",'+
-      '"official_url":"https://site-officiel/page",'+
-      '"quotes":["extrait exact assez long de la page","autre extrait exact"],'+
+      '"why_now":"Élément nouvellement annoncé",'+
+      '"official_url":"https://site-officiel/page-ou-chaine-vide",'+
+      '"quotes":["citation exacte si disponible"],'+
       '"festival_name":"Nom du festival ou chaîne vide"}]}. ' +
-      "Maximum trois candidats, du plus intéressant au moins intéressant.",
+      "Donne jusqu'à SIX pistes distinctes, classées par potentiel éditorial. " +
+      "candidates:[] seulement si aucune actualité récente crédible n'a été trouvée.",
       true
     );
     if (!Array.isArray(discovery.candidates)) throw Error("Aucun tableau de sujets");
     let chosen = null;
     const rejectionDetails = [];
-    for (const news of discovery.candidates.slice(0, 3)) {
+    // Quatre sources au maximum par passage pour éviter les longues fonctions.
+    for (const news of discovery.candidates.slice(0, 4)) {
       const title = typeof news?.topic === "string" ? news.topic.slice(0, 120) : "Sujet non identifié";
       const report = reason => rejectionDetails.push({ topic: title, reason });
       if (!news || typeof news.topic !== "string" || news.topic.length < 20 ||
@@ -332,6 +345,9 @@ async function run(key) {
       outcome = "aucune_source_officielle_verifiee";
       const report = { result: outcome,
         candidates_found: discovery.candidates.length,
+        checked: Math.min(4, discovery.candidates.length),
+        discovery_status: discovery.candidates.length === 0
+          ? "no_candidates_returned" : "candidates_not_verified",
         rejections: rejectionDetails };
       // Garder aussi un résumé exploitable par l'administration.
       outcome = ("Aucune source vérifiée : " + rejectionDetails
