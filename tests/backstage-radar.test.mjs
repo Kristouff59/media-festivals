@@ -100,6 +100,35 @@ const ctx = {
   URL, Response, console, Date, JSON,
 };
 vm.runInNewContext(source, ctx);
+// Pages de news officielles sans métadonnées, mais avec une date affichée
+// dans l'en-tête du billet à côté de son temps de lecture.
+function datedHeading(daysAgo) {
+  const d = new Date(Date.now() - daysAgo*86400000);
+  const m = new Intl.DateTimeFormat("en-GB", {month:"long",timeZone:"UTC"}).format(d);
+  const publishedText = d.getUTCDate() + " " + m.toUpperCase() +
+    " " + d.getUTCFullYear();
+  return '<html><body><div class="post-info">' + publishedText +
+    ' 1 MIN READ</div><h1>World Tour announcement</h1><article>' +
+    'World tour dates in 2027, including February 23, March 5 and October 30, 2027' +
+    '</article></body></html>';
+}
+const readDate = html => vm.runInNewContext(
+  "officialPublishedDate(" + JSON.stringify(html) + ")", ctx
+);
+assert.equal(readDate(datedHeading(2)).reason, null,
+  "Date de publication visible et récente acceptée");
+assert.equal(readDate(datedHeading(12)).reason, "annonce_trop_ancienne",
+  "L'annonce U2 du 15 octobre ne doit pas être publiée le 27 octobre");
+assert.equal(readDate('<html><body><h1>Concert du 30 octobre 2027</h1>' +
+  '<p>Billets disponibles pour le 30 octobre 2027</p></body></html>').reason,
+  "date_publication_absente",
+  "La date d'un concert ne doit pas valider la fraîcheur de l'annonce");
+assert.equal(readDate('<html><head><meta property="article:published_time" ' +
+  'content="2025-11-17T10:00:00Z"></head><body><h1>Tour</h1>' +
+  '<div>' + datedHeading(2) + '</div></body></html>').reason,
+  "annonce_trop_ancienne",
+  "Une métadonnée ancienne ne doit pas être blanchie par une date visible récente");
+
 const unauth = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "invalid" }, body: "{}" }));
 assert.equal(unauth.status, 401);
