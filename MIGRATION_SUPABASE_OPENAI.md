@@ -122,6 +122,52 @@ Les contrôles sur l'ancienneté, les sources officielles et la publication
 uniquement après validation restent obligatoires et ne peuvent pas être
 écartés par un retour éditorial.
 
+## Comprendre les recherches sans résultat (diagnostic du radar)
+
+Le radar ne crée pas un article lorsqu'il n'a pas de source officielle récente
+et vérifiable. Pour rendre ces vérifications compréhensibles, le résultat du
+test `POST` affiche désormais les champs :
+
+- `candidates_found` : nombre de pistes rendues par OpenAI ;
+- `rejections` : liste des titres examinés et des raisons pour lesquelles
+  ils ont été écartés.
+
+Exemple :
+
+```json
+{
+  "result": "aucune_source_officielle_verifiee",
+  "candidates_found": 2,
+  "rejections": [
+    {
+      "topic": "Exemple de festival",
+      "reason": "date_publication_absente"
+    },
+    {
+      "topic": "Exemple de tournée",
+      "reason": "annonce_trop_ancienne"
+    }
+  ]
+}
+```
+
+Principales raisons : `candidat_invalide`, `sujet_deja_traite`,
+`url_officielle_invalide`, `source_inaccessible`, `source_non_html`,
+`date_publication_absente`, `annonce_trop_ancienne`,
+`date_publication_future`, `citations_non_retrouvees`,
+`sujet_absent_de_la_source`. La sortie ne contient ni clé privée ni
+extrait confidentiel ; elle affiche uniquement les sujets et la catégorie
+du rejet.
+
+La première version du diagnostic utilise volontairement les mêmes règles
+strictes de fraîcheur et de recoupement. Le radar reste limité à trois
+candidats par passage : si aucun n'est acceptable, aucun article n'est créé.
+
+**Pour installer le diagnostic dans Supabase**, remplacer le code de
+`backstage-radar` par celui du dépôt et cliquer sur **Deploy updates**.
+Un changement dans GitHub seul ne met pas à jour la fonction déjà déployée.
+La méthode de test et les en-têtes restent identiques.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
