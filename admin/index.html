@@ -9,7 +9,7 @@
 <style>
 :root{color-scheme:dark;font-family:Inter,"Segoe UI",Arial,sans-serif;--bg:#101614;--card:#1c2420;--stroke:#35413a;--text:#f5f6ed;--muted:#b3c1b6;--accent:#d3f177}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:16px}
-a{color:var(--accent)}button,input{font:inherit}button{cursor:pointer}
+a{color:var(--accent)}button,input,textarea,select{font:inherit}button{cursor:pointer}
 header{border-bottom:1px solid var(--stroke);padding:20px max(20px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;gap:15px;align-items:center}
 .brand{font-size:22px;letter-spacing:.06em;font-weight:900;text-decoration:none;color:var(--text)}
 main{max-width:1100px;margin:35px auto 100px;padding:0 20px}
@@ -23,7 +23,17 @@ button.secondary{background:transparent;color:var(--text);border:1px solid var(-
 button.danger{background:#422a2a;color:#fce6e6}
 .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .formfield{display:block;margin:20px 0 12px;color:var(--muted)}
-input{display:block;width:100%;max-width:480px;border-radius:8px;border:1px solid var(--stroke);padding:13px;background:#0d100f;color:white}
+input:not([type="checkbox"]),textarea,select{display:block;width:100%;max-width:640px;border-radius:8px;border:1px solid var(--stroke);padding:13px;background:#0d100f;color:white}
+textarea{min-height:125px;resize:vertical;line-height:1.5}
+#rejection-editor{width:100%;padding:16px;border:1px solid var(--stroke);border-radius:10px;margin-top:14px;background:#141b18}
+#rejection-editor[hidden]{display:none}
+#rejection-editor label{display:block;margin:12px 0 6px;font-weight:700}
+#rejection-editor .small-help{font:13px/1.5 Inter,"Segoe UI",sans-serif;color:var(--muted);margin:5px 0 14px}
+.feedback-switch{display:flex!important;align-items:start;gap:10px;line-height:1.4;max-width:650px}
+.feedback-switch input{flex:none;margin-top:4px;width:18px;height:18px}
+.private-note{margin-top:20px;border-left:3px solid var(--accent);padding:12px 16px;background:#202b22}
+.private-note p{font:15px/1.55 Inter,"Segoe UI",sans-serif}
+
 #alert{margin:20px 0;min-height:15px}#alert:not(:empty){padding:14px;border:1px solid var(--stroke);border-radius:8px}
 #layout{display:grid;grid-template-columns:minmax(245px,320px) minmax(0,1fr);gap:24px;margin-top:28px}
 #drafts{display:flex;flex-direction:column;gap:10px}
@@ -77,7 +87,12 @@ const $=id=>document.getElementById(id);
 const setMessage=(message)=>{$('alert').textContent=message||''};
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const valid=SUPABASE_URL.startsWith('https://')&&SUPABASE_PUBLISHABLE_KEY.length>24&&!SUPABASE_URL.includes('VOTRE-PROJET');
-let client,drafts=[],selected=null,busy=false;
+let client,drafts=[],selected=null,busy=false,feedbackByDraft={};
+const reasonLabels={
+  artiste:'Artiste ou groupe',ligne_editoriale:'Hors ligne éditoriale',
+  angle:'Angle ou sujet à revoir',style:'Style ou ton',
+  fiabilite:'Informations ou sources',actualite:'Actualité insuffisante',autre:'Autre raison'
+};
 function setVisible(id,on){$(id).hidden=!on}
 function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé'})[v]||v}
 function documentText(a){
@@ -98,11 +113,53 @@ if(fests.length){html+='<h3>Fiches festivals mises à jour</h3>';for(const chang
 html+='<h3>Sources</h3><ul class="source-list">';
 for(const source of a.sources||[]){if(/^https:\/\/[^\s"'<>]+$/.test(source.url))html+='<li><a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(source.url)+'">'+escapeHTML(source.label)+'</a></li>'}
 html+='</ul>';
-if(row.status==='pending')html+='<div class="actions row"><button id="approve">Publier cet article</button><button class="danger" id="reject">Refuser</button></div>';
-else html+='<p class="pill">'+escapeHTML(statusName(row.status))+'</p>';
+if(row.status==='pending'){
+ html+='<div class="actions"><div class="row"><button id="approve">Publier cet article</button>'+
+   '<button class="danger" id="reject">Refuser et expliquer pourquoi</button></div>'+
+   '<form id="rejection-editor" hidden>'+
+     '<strong>Votre retour éditorial</strong>'+
+     '<p class="small-help">Expliquez ce qui ne correspond pas à BACKSTAGE. Le radar pourra s\u2019en inspirer pour les prochains sujets et articles.</p>'+
+     '<label for="feedback-category">Raison principale</label>'+
+     '<select id="feedback-category" required>'+
+       Object.entries(reasonLabels).map(([value,label])=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(label)+'</option>').join('')+
+     '</select>'+
+     '<label for="feedback-reason">Ce que vous aimeriez à la place</label>'+
+     '<textarea id="feedback-reason" maxlength="1500" minlength="8" required '+
+       'placeholder="Ex. Ce groupe ne m\u2019intéresse pas. Privilégier les actualités rock plus alternatives et les annonces de festivals."></textarea>'+
+     '<label class="feedback-switch"><input id="feedback-future" type="checkbox" checked>'+
+       '<span>Tenir compte de mon avis dans les prochains articles</span></label>'+
+     '<p class="small-help">Décochez pour un refus exceptionnel. Les faits et les sources restent vérifiés indépendamment de vos préférences.</p>'+
+     '<div class="row"><button id="save-rejection" type="submit">Refuser et enregistrer mon avis</button>'+
+       '<button id="cancel-rejection" type="button" class="secondary">Annuler</button></div>'+
+   '</form></div>';
+}else{
+ html+='<p class="pill">'+escapeHTML(statusName(row.status))+'</p>';
+ const feedback=feedbackByDraft[row.id];
+ if(row.status==='rejected'&&feedback){
+   html+='<div class="private-note"><strong>Votre retour enregistré</strong>'+
+     '<p>'+escapeHTML(reasonLabels[feedback.category]||'Retour éditorial')+'</p>'+
+     '<p>'+escapeHTML(feedback.reason)+'</p>'+
+     '<p class="muted">'+(feedback.apply_to_future?'Utilisé pour orienter les prochains articles':'Refus ponctuel, non réutilisé')+'</p></div>';
+ }
+}
 $('preview').innerHTML=html;
 $('approve')?.addEventListener('click',()=>decide(row,'published'));
-$('reject')?.addEventListener('click',()=>decide(row,'rejected'));
+$('reject')?.addEventListener('click',()=>{
+  $('rejection-editor').hidden=false;
+  $('reject').hidden=true;
+  $('feedback-reason').focus();
+});
+$('cancel-rejection')?.addEventListener('click',()=>{
+  $('rejection-editor').hidden=true;
+  $('reject').hidden=false;
+});
+$('rejection-editor')?.addEventListener('submit',event=>{
+  event.preventDefault();
+  const category=$('feedback-category').value;
+  const reason=$('feedback-reason').value.trim();
+  if(reason.length<8){setMessage('Précisez le motif de refus (8 caractères minimum).');return}
+  void rejectWithFeedback(row,category,reason,$('feedback-future').checked);
+});
 }
 function showList(){
 $('counter').textContent=drafts.filter(x=>x.status==='pending').length+' article(s) à valider';
@@ -115,6 +172,14 @@ async function load(){
 const {data,error}=await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload').order('created_at',{ascending:false}).limit(60);
 if(error){setMessage('Lecture impossible : '+error.message);return}
 drafts=data||[];
+const feedbackResult=await client.from('editorial_feedback')
+  .select('draft_id,category,reason,apply_to_future').order('created_at',{ascending:false}).limit(100);
+if(feedbackResult.error){
+  feedbackByDraft={};
+  setMessage('Mémoire éditoriale non encore installée : exécutez migration-editorial-feedback.sql dans Supabase.');
+}else{
+  feedbackByDraft=Object.fromEntries((feedbackResult.data||[]).map(f=>[f.draft_id,f]));
+}
 const radar=await client.from('editorial_radar_runs').select('status,detail,started_at')
   .order('started_at',{ascending:false}).limit(1);
 if(!radar.error && radar.data?.length){
@@ -139,6 +204,27 @@ setMessage(status==='published'?'Article publié : il sera visible sur BACKSTAGE
 await load();
 }catch(err){setMessage('Décision non enregistrée : '+err.message);showPreview()}
 finally{busy=false}
+}
+async function rejectWithFeedback(row,category,reason,applyFuture){
+if(busy||row.status!=='pending')return;
+if(!confirm('Refuser cet article et enregistrer votre retour éditorial ?'))return;
+busy=true;
+$('approve').disabled=true;
+$('save-rejection').disabled=true;
+setMessage('Enregistrement du refus et de votre avis…');
+try{
+  const {error}=await client.rpc('reject_editorial_draft_with_feedback',{
+    p_draft_id:row.id,p_category:category,p_reason:reason,p_apply_to_future:applyFuture
+  });
+  if(error)throw error;
+  setMessage(applyFuture
+    ? 'Article refusé. Votre avis guidera les prochaines recherches et rédactions.'
+    : 'Article refusé. Ce retour restera ponctuel et ne sera pas réutilisé.');
+  await load();
+}catch(error){
+  setMessage('Refus non enregistré : '+error.message);
+  showPreview();
+}finally{busy=false}
 }
 async function init(){
 if(!valid){setVisible('setup',true);return}
