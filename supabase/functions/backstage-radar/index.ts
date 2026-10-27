@@ -114,34 +114,40 @@ function officialPublishedDate(html) {
     if (m) candidates.push(m[1]);
   }
   const dates = candidates.map(x => Date.parse(String(x))).filter(Number.isFinite);
-  if (!dates.length) return null;
+  if (!dates.length) return { value: null, reason: "date_publication_absente" };
   const published = Math.min(...dates);
   const age = Date.now() - published;
-  if (age < -86400000 || age > 7 * 86400000) return null;
-  return new Date(published).toISOString().slice(0, 10);
+  if (age < -86400000) return { value: null, reason: "date_publication_future" };
+  if (age > 7 * 86400000) return { value: null, reason: "annonce_trop_ancienne" };
+  return { value: new Date(published).toISOString().slice(0, 10), reason: null };
 }
-async function verify(news) {
+async function verify(news, diagnostic = {}) {
+  const reject = reason => { diagnostic.reason = reason; return null; };
   const url = officialUrl(news.official_url);
-  if (!url || !Array.isArray(news.quotes)) return null;
+  if (!url) return reject("url_officielle_invalide");
+  if (!Array.isArray(news.quotes)) return reject("citations_absentes");
   const r = await fetch(url, {
     redirect: "error", signal: AbortSignal.timeout(12000),
     headers: { Accept: "text/html", "User-Agent": "BACKSTAGE-editorial-check/1.0" },
   });
-  if (!r.ok || !/html/i.test(r.headers.get("content-type") || "") ||
-      Number(r.headers.get("content-length") || 0) > 1200000) return null;
+  if (!r.ok) return reject("source_http_" + r.status);
+  if (!/html/i.test(r.headers.get("content-type") || "")) return reject("source_non_html");
+  if (Number(r.headers.get("content-length") || 0) > 1200000)
+    return reject("source_trop_volumineuse");
   const html = await r.text();
-  if (html.length > 1200000) return null;
-  const published = officialPublishedDate(html);
-  if (!published) return null; // Date d'annonce absente ou trop ancienne
+  if (html.length > 1200000) return reject("source_trop_volumineuse");
+  const publication = officialPublishedDate(html);
+  if (!publication.value) return reject(publication.reason);
   const source = plain(html), normalized = norm(source);
-  if (normalized.length < 250) return null;
+  if (normalized.length < 250) return reject("source_trop_courte");
   // Le modèle n'est pas une preuve : citer une phrase retrouvée textuellement.
   const matches = news.quotes.filter(q => typeof q === "string" &&
     norm(q).length >= 35 && normalized.includes(norm(q)));
-  if (!matches.length) return null;
+  if (!matches.length) return reject("citations_non_retrouvees");
   const tokens = norm(news.festival_name || news.topic).split(" ").filter(t => t.length > 4);
-  if (tokens.length && !tokens.some(t => normalized.includes(t))) return null;
-  return { url, source, published };
+  if (tokens.length && !tokens.some(t => normalized.includes(t)))
+    return reject("sujet_absent_de_la_source");
+  return { url, source, published: publication.value };
 }
 function articleValid(a, source) {
   if (!a || typeof a.title !== "string" || a.title.length < 22 || a.title.length > 140 ||
