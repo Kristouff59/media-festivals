@@ -6,6 +6,13 @@ import { webcrypto } from "node:crypto";
 
 const source = fs.readFileSync("supabase/functions/backstage-radar/index.ts", "utf8");
 new vm.Script(source, { filename: "backstage-radar/index.ts" });
+assert.doesNotMatch(source, /const prioritySources\s*=/,
+  "Le moteur ne doit pas contenir de liste fixe imposée");
+assert.match(source, /async function activeEditorialSources\(key\)/,
+  "La liste évolutive provient de la base de données");
+assert.match(source, /const WATCH_PER_RUN\s*=\s*12/,
+  "Contrôle borné par passage avec rotation des sites");
+
 const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
 const feedbackMigration = fs.readFileSync("supabase/migration-editorial-feedback.sql", "utf8");
 const sourceMigration = fs.readFileSync("supabase/migration-dynamic-sources.sql", "utf8");
