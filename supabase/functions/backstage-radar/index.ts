@@ -299,6 +299,7 @@ async function run(key) {
     );
     if (!Array.isArray(discovery.candidates)) throw Error("Aucun tableau de sujets");
     let chosen = null;
+    const rejectionDetails = [];
     for (const news of discovery.candidates.slice(0, 3)) {
       if (!news || typeof news.topic !== "string" || news.topic.length < 20 ||
           typeof news.topic_key !== "string" ||
