@@ -58,18 +58,40 @@ Supabase injecte automatiquement les variables `SUPABASE_URL` et
 `SUPABASE_SECRET_KEYS` dans les Edge Functions hébergées. Il ne faut pas
 les créer soi-même comme secrets de fonction.
 
+## Important — mise à jour du moteur le 27 octobre 2026
+
+Un premier essai a bien déposé un article sur Simple Plan, mais l'annonce
+était déjà connue depuis novembre 2025. Cette anomalie a révélé que l'ancien
+moteur vérifiait le fait sans vérifier la date de l'annonce.
+
+Le code du radar inclut désormais une exigence stricte : la page officielle
+doit contenir une **date de publication vérifiable dans ses métadonnées**,
+datée des **7 derniers jours**. En l'absence de date, la proposition est
+écartée. Cette politique peut écarter certaines annonces pourtant nouvelles
+lorsque le site officiel ne fournit pas de date exploitable : c'est une
+limitation assumée pour réduire les fausses actualités.
+
+**Si `backstage-radar` a déjà été déployé**, remplacer son code par la
+[version actuelle](supabase/functions/backstage-radar/index.ts) dans
+Supabase → Edge Functions → backstage-radar → Code, puis redéployer.
+**Modifier le fichier sur GitHub seul ne redéploie pas la fonction.**
+Refuser depuis `/admin/` le premier brouillon Simple Plan s'il annonce
+à tort une nouveauté d'octobre 2026.
+
+Après redéploiement, utiliser d'abord une requête de santé
+`{"healthcheck":true}`, puis programmer Supabase Cron.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
    `sb_secret_...` du projet (jamais la clé publishable pour ce job).
-2. Dans **SQL Editor**, exécuter la commande SQL suivante en remplaçant
-   le texte entre apostrophes par votre clé secrète :
-
-   `select vault.create_secret('VOTRE_CLE_SB_SECRET', 'backstage_cron_secret');`
-
-3. Dans Supabase, ne pas partager ni conserver le résultat de la requête
-   en dehors du projet. Au besoin supprimer l'historique de l'éditeur SQL
-   contenant la clé. La clé est chiffrée par Supabase Vault pour son stockage.
+2. Dans **Database → Vault → Secrets**, cliquer sur **New secret** et
+   créer un secret nommé exactement `backstage_cron_secret`, avec pour valeur
+   cette clé privée. **Ne pas coller la clé privée dans une requête SQL,
+   le dépôt GitHub ou une conversation.**
+3. Le secret est chiffré au repos par Supabase Vault. Le script de calendrier
+   lit seulement `vault.decrypted_secrets` à l'exécution, côté base de données.
+   Vérifier le nom du secret avant de poursuivre.
 4. Lancer d'abord un **test sans OpenAI** avec :
 
    ```sql
