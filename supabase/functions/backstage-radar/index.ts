@@ -89,6 +89,37 @@ function plain(html) {
     .replace(/<[^>]*>/g, " ").replace(/&(?:amp|nbsp|lt|gt|quot|apos);/gi, " ")
     .replace(/\s+/g, " ").trim().slice(0, 60000);
 }
+// Une date de concert n'est pas une date d'annonce. Les anciennes pages
+// d'événements ne doivent pas devenir de fausses actualités.
+function officialPublishedDate(html) {
+  const candidates = [];
+  for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+    const attr = (name) => {
+      const m = tag.match(new RegExp("\\b" + name + "\\s*=\\s*([\"'])(.*?)\\1", "i"));
+      return m?.[2] || "";
+    };
+    const field = (attr("property") || attr("name") || attr("itemprop")).toLowerCase();
+    if (["article:published_time", "datepublished", "datecreated", "pubdate",
+         "publish_date", "dc.date.issued", "citation_date"].includes(field)) {
+      candidates.push(attr("content") || attr("datetime"));
+    }
+  }
+  for (const m of html.matchAll(/["']datePublished["']\s*:\s*["']([^"']+)["']/gi)) {
+    candidates.push(m[1]);
+  }
+  for (const tag of html.match(/<time\b[^>]*>/gi) || []) {
+    if (!/itemprop\s*=\s*["']datePublished["']/i.test(tag) &&
+        !/\bpubdate\b/i.test(tag)) continue;
+    const m = tag.match(/\bdatetime\s*=\s*["']([^"']+)["']/i);
+    if (m) candidates.push(m[1]);
+  }
+  const dates = candidates.map(x => Date.parse(String(x))).filter(Number.isFinite);
+  if (!dates.length) return null;
+  const published = Math.min(...dates);
+  const age = Date.now() - published;
+  if (age < -86400000 || age > 7 * 86400000) return null;
+  return new Date(published).toISOString().slice(0, 10);
+}
 async function verify(news) {
   const url = officialUrl(news.official_url);
   if (!url || !Array.isArray(news.quotes)) return null;
@@ -100,6 +131,8 @@ async function verify(news) {
       Number(r.headers.get("content-length") || 0) > 1200000) return null;
   const html = await r.text();
   if (html.length > 1200000) return null;
+  const published = officialPublishedDate(html);
+  if (!published) return null; // Date d'annonce absente ou trop ancienne
   const source = plain(html), normalized = norm(source);
   if (normalized.length < 250) return null;
   // Le modèle n'est pas une preuve : citer une phrase retrouvée textuellement.
@@ -108,7 +141,7 @@ async function verify(news) {
   if (!matches.length) return null;
   const tokens = norm(news.festival_name || news.topic).split(" ").filter(t => t.length > 4);
   if (tokens.length && !tokens.some(t => normalized.includes(t))) return null;
-  return { url, source };
+  return { url, source, published };
 }
 function articleValid(a, source) {
   if (!a || typeof a.title !== "string" || a.title.length < 22 || a.title.length > 140 ||
@@ -210,6 +243,9 @@ async function run(key) {
       "France et pays voisins bienvenus, mais ne te limite pas à de petits événements locaux. " +
       "Ne propose pas de liste d'agendas génériques, de rumeurs, ni une annonce déjà connue : " +
       JSON.stringify(previousTitles.slice(0, 45)) + ". " +
+      "Exige une page officielle d'annonce datée des 7 derniers jours (métadonnées datePublished). " +
+      "Une page de billetterie pour un événement imminent n'est PAS une nouvelle annonce. " +
+      "Si aucune preuve de fraîcheur n'existe, écarte le sujet. " +
       "Trouve pour chaque sujet une page de source PRIMAIRE accessible en HTTPS : " +
       "festival, artiste, salle officielle, producteur ou organisateur. " +
       "Fournis deux citations assez longues copiées EXACTEMENT de la page officielle. " +
@@ -247,7 +283,7 @@ async function run(key) {
       "sans citations fabriquées ni expérience de terrain inventée. " +
       "Entre 220 et 480 mots, chapô, paragraphes et intertitres. " +
       "Ne mentionne jamais une date, un prix, une ville ou un artiste qui ne sont pas présents dans la source. " +
-      "Sujet : " + news.topic + ". Actualité : " + news.why_now + ". " +
+      "Sujet : " + news.topic + ". Annonce publiée officiellement le " + proof.published + ". Actualité : " + news.why_now + ". " +
       "Source officielle (seule base factuelle autorisée) : " + proof.url + "\n" +
       proof.source.slice(0, 11000) + "\n" +
       "Retourne un JSON valide et UNIQUEMENT un JSON : " +
