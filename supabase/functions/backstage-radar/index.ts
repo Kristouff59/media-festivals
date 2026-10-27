@@ -285,7 +285,8 @@ async function verify(news, diagnostic = {}) {
     catch (_) { /* une source secondaire en échec ne suffit jamais */ }
   }
   if (!publication.value && !corroboration)
-    return reject(news.press_url ? "presse_non_corroboree" : publication.reason);
+    return reject(publication.reason === "date_publication_absente" && news.press_url
+      ? "presse_non_corroboree" : publication.reason);
   return { url, source, published: publication.value || corroboration.published,
     corroboration_url: corroboration?.url || null };
 }
