@@ -2,8 +2,15 @@
 -- Peut être réexécutée : elle ne supprime aucun article ni compte.
 alter table public.editorial_drafts
   add column if not exists topic_key text;
-create unique index if not exists editorial_drafts_topic_unique
-  on public.editorial_drafts(topic_key) where topic_key is not null;
+-- PostgREST upsert utilise ON CONFLICT (topic_key).
+-- Un index unique partiel « WHERE topic_key IS NOT NULL » n'est pas compatible
+-- sans fournir sa condition. PostgreSQL accepte plusieurs NULL dans un
+-- index unique ordinaire, donc cet index complet protège aussi les anciens
+-- brouillons dont topic_key est NULL.
+drop index if exists public.editorial_drafts_topic_unique;
+create unique index editorial_drafts_topic_unique
+  on public.editorial_drafts(topic_key);
+notify pgrst, 'reload schema';
 
 create table if not exists public.editorial_radar_runs (
   slot text primary key,
