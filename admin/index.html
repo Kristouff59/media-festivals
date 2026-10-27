@@ -130,6 +130,7 @@ if(row.status==='pending'){
        '<span>Tenir compte de mon avis dans les prochains articles</span></label>'+
      '<p class="small-help">Décochez pour un refus exceptionnel. Les faits et les sources restent vérifiés indépendamment de vos préférences.</p>'+
      '<div class="row"><button id="save-rejection" type="submit">Refuser et enregistrer mon avis</button>'+
+       '<button id="reject-no-feedback" type="button" class="secondary">Refuser sans commentaire</button>'+
        '<button id="cancel-rejection" type="button" class="secondary">Annuler</button></div>'+
    '</form></div>';
 }else{
@@ -153,6 +154,7 @@ $('cancel-rejection')?.addEventListener('click',()=>{
   $('rejection-editor').hidden=true;
   $('reject').hidden=false;
 });
+$('reject-no-feedback')?.addEventListener('click',()=>decide(row,'rejected'));
 $('rejection-editor')?.addEventListener('submit',event=>{
   event.preventDefault();
   const category=$('feedback-category').value;
