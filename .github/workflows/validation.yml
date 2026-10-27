@@ -8,6 +8,7 @@ on:
       - 'supabase/functions/**'
       - 'supabase/migration-radar.sql'
       - 'supabase/migration-editorial-feedback.sql'
+      - 'supabase/migration-ai-logs.sql'
       - 'supabase/config.toml'
       - 'supabase/schedule-radar.sql'
       - 'tests/**'
