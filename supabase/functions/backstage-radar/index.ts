@@ -485,7 +485,8 @@ async function run(key) {
       "Important : les priorités ne limitent PAS le périmètre de BACKSTAGE, qui couvre aussi " +
       "les tournées, les grands concerts, les festivals internationaux et l'actualité sociale du live. " +
       "Utilise une VRAIE recherche Web pour découvrir des annonces publiées dans les 7 derniers jours. " +
-      "Choisis jusqu'à TROIS grandes annonces parmi festivals et programmations, rock / post-punk " +
+      "Propose de ZÉRO à SIX pistes, en donnant la priorité aux NOUVELLES programmations " +
+      "et aux AJOUTS vérifiables de groupes de festivals majeurs, puis au rock / post-punk " +
       "et scènes alternatives, tournées majeures, retours de groupes, pop, électro, rap, et société du live. " +
       "Privilégie leur impact éditorial, pas la proximité géographique. " +
       "France et pays voisins bienvenus, mais ne te limite pas à de petits événements locaux. " +
@@ -513,6 +514,8 @@ async function run(key) {
       "mais elle doit avoir un VRAI intérêt journalistique. N'invente jamais une URL ni un extrait. " +
       "Ne propose RIEN simplement pour remplir le site : " +
       "ni petites annonces banales ni répétitions de tournées, ni artistes sans angle pertinent. " +
+      "Une nouvelle annonce de tête d'affiche d'un grand festival mérite normalement davantage " +
+      "d'attention qu'une tournée déjà connue d'un groupe secondaire, sans quota de publication. " +
       "Si aucun sujet n'est suffisamment neuf, important ou intéressant pour la ligne éditoriale, " +
       "réponds candidates:[] ; c'est un résultat normal et souhaitable. " +
       "Distingue une annonce originale de tournée et les nouvelles dates ajoutées récemment : " +
