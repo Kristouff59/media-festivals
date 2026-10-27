@@ -51,7 +51,9 @@ rédacteur ont déjà été créés.
 
 **Important :** le coût API OpenAI est distinct de ChatGPT Plus. Activer
 des alertes de consommation sur le compte API. Le radar prévoit au plus
-**deux appels OpenAI par passage**, deux fois par jour. Il limite également
+**deux requêtes OpenAI par passage** (une recherche Web qui peut utiliser
+jusqu'à trois appels d'outil, puis une rédaction), deux fois par jour.
+Les appels d'outil Web ont également un coût. Il limite également
 la file à cinq articles en attente.
 
 Supabase injecte automatiquement les variables `SUPABASE_URL` et
@@ -160,13 +162,36 @@ extrait confidentiel ; elle affiche uniquement les sujets et la catégorie
 du rejet.
 
 La première version du diagnostic utilise volontairement les mêmes règles
-strictes de fraîcheur et de recoupement. Le radar reste limité à trois
+strictes de fraîcheur et de recoupement. Le radar peut découvrir jusqu'à six pistes et vérifier au maximum quatre
 candidats par passage : si aucun n'est acceptable, aucun article n'est créé.
+Une découverte vide signale que la recherche elle-même n'a trouvé aucune
+piste, et non que les sources ont été rejetées.
 
 **Pour installer le diagnostic dans Supabase**, remplacer le code de
 `backstage-radar` par celui du dépôt et cliquer sur **Deploy updates**.
 Un changement dans GitHub seul ne met pas à jour la fonction déjà déployée.
 La méthode de test et les en-têtes restent identiques.
+
+## Optimisation de la découverte (27 octobre 2026, deuxième ajustement)
+
+Le retour `{"candidates_found":0,"rejections":[]}` indiquait que le modèle
+renvoyait directement une liste vide. La consigne précédente demandait
+trop de preuves pendant la découverte (source primaire, métadonnée récente,
+citations exactes). Le nouveau moteur cherche désormais les **pistes**
+en premier, au besoin à travers des articles de presse qui signalent
+l'actualité, puis **vérifie séparément la source officielle** avant toute
+rédaction ou publication. Les pages officielles trop anciennes ou non
+datées sont toujours écartées. Les sujets proposés peuvent donc
+toujours être refusés par le vérificateur : une liste de pistes n'est
+pas une preuve de publication possible.
+
+L'outil Web peut exécuter jusqu'à trois appels au lieu de deux ; les
+frais de recherche peuvent donc augmenter légèrement. En revanche,
+le moteur n'effectue jamais une rédaction si aucune preuve acceptable
+n'est trouvée.
+
+**Cette amélioration nécessite un redéploiement de l'Edge Function** :
+il ne suffit pas de mettre à jour GitHub.
 
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
@@ -233,7 +258,12 @@ dans `/admin/` et visibles au prochain accès.
 
 ## Comment fonctionne la veille OpenAI
 
-- Sélection de 0 à 3 pistes récentes avec une vraie recherche Web OpenAI.
+- Découverte de 0 à 6 pistes récentes avec une vraie recherche Web OpenAI.
+  La recherche ne doit plus vérifier elle-même les métadonnées de publication
+  ou produire deux citations avant de retourner une piste : elle identifie
+  les annonces potentielles, puis le moteur vérifie les sources séparément.
+  Jusqu'à quatre pistes sont examinées par passage, sans créer de brouillon
+  en cas de vérification insuffisante.
 - Sources primaires seulement, HTTPS, blocage des agrégateurs courants.
 - Vérification directe des extraits réellement présents sur la page officielle.
 - Rédaction originale, bornes de longueur et cohérence de quelques données
