@@ -8,6 +8,13 @@ const source = fs.readFileSync("supabase/functions/backstage-radar/index.ts", "u
 new vm.Script(source, { filename: "backstage-radar/index.ts" });
 const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
 const feedbackMigration = fs.readFileSync("supabase/migration-editorial-feedback.sql", "utf8");
+const sourceMigration = fs.readFileSync("supabase/migration-dynamic-sources.sql", "utf8");
+assert.match(sourceMigration, /create table if not exists public\.editorial_sources/i);
+assert.match(sourceMigration, /enable row level security/i);
+assert.match(sourceMigration, /create policy editorial_sources_admin_read/i);
+assert.match(sourceMigration, /learn_editorial_source/i);
+assert.match(sourceMigration, /mark_editorial_sources_checked/i);
+assert.match(sourceMigration, /on conflict\(host\) do nothing/i);
 const aiLogMigration = fs.readFileSync("supabase/migration-ai-logs.sql","utf8");
 assert.match(aiLogMigration,/create table if not exists public\.editorial_ai_logs/i);
 assert.match(aiLogMigration,/enable row level security/i);
@@ -27,6 +34,12 @@ let emptyDiscovery = false;
 let pressConfirmation = false;
 let logWriteError = false;
 const savedLogs = [];
+const learnedSources=[];
+const monitoredHosts=[];
+const watchedSources = [
+  {host:"cabaretvert.com",name:"Cabaret Vert",
+    site_url:"https://cabaretvert.com/programmation/",source_kind:"festival"}
+];
 const prompts = [];
 const editorialReturns = [
   { article_title:"Concert XYZ", category:"artiste",
@@ -66,6 +79,23 @@ async function fakeFetch(url, options = {}) {
   if (address.includes("/rest/v1/editorial_radar_runs?on_conflict=slot")) return answer([{ slot: "2026-10-26-matin" }], 201);
   if (address.includes("/rest/v1/editorial_drafts?select=topic_key")) return answer([]);
   if (address.includes("/rest/v1/editorial_feedback?select=")) return answer(editorialReturns);
+  if (address.includes("/rest/v1/editorial_sources?select=")) {
+    // La liste est désormais fournie exclusivement par Supabase.
+    return answer([...watchedSources]);
+  }
+  if (address.includes("/rest/v1/rpc/mark_editorial_sources_checked")) {
+    monitoredHosts.push(...JSON.parse(options.body).p_hosts);
+    return answer(null,204);
+  }
+  if (address.includes("/rest/v1/rpc/learn_editorial_source")) {
+    const p=JSON.parse(options.body);
+    learnedSources.push(p);
+    if (!watchedSources.some(x=>x.host===p.p_host)) {
+      watchedSources.push({host:p.p_host,name:p.p_name,
+        site_url:p.p_site_url,source_kind:p.p_source_kind});
+    }
+    return answer(null,204);
+  }
   if (address.endsWith("/rest/v1/editorial_ai_logs")) {
     if (logWriteError) return answer({ message:"Test de panne du journal" }, 503);
     savedLogs.push(...JSON.parse(options.body));
@@ -201,6 +231,12 @@ assert.ok(prompts[1].includes("nouvelles annonces post-punk"), "Le moteur lit la
 assert.ok(!prompts[0].includes("Ce rejet est ponctuel"), "Un refus ponctuel n'est pas transmis");
 assert.ok(!prompts[1].includes("Ce rejet est ponctuel"), "Le refus ponctuel est aussi absent de la rédaction");
 assert.equal(insertedDraft.status, "pending", "Aucune publication automatique");
+assert.equal(result.source_learned, true, "Une source officielle vérifiée est mémorisée");
+assert.equal(learnedSources.length,1);
+assert.equal(learnedSources[0].p_host,"grandfestival.example");
+assert.equal(learnedSources[0].p_site_url,"https://grandfestival.example/");
+assert.ok(monitoredHosts.includes("cabaretvert.com"),"Les sources existantes sont interrogées");
+assert.equal(openaiCalls,2,"La mémoire des sources ne déclenche aucun appel OpenAI");
 assert.equal(insertedDraft.payload.article.sources[0].url, "https://grandfestival.example/programme");
 assert.equal(runUpdates, 1);
 // Aucun feedback n'est envoyé si le rédacteur choisit de ne pas l'appliquer.
@@ -210,6 +246,8 @@ logWriteError=true;
 const noMemory = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
 assert.equal(noMemory.status, 200, "Une panne Supabase du journal n'interrompt pas la veille");
+assert.ok(prompts[0].includes("grandfestival.example"),
+ "Une nouvelle source apprise apparaît dans la veille suivante, sans liste figée");
 logWriteError=false;
 assert.ok(!prompts.some(p=>p.includes("nouvelles annonces post-punk")),
   "L'avis décoché est exclu même après un précédent usage");
