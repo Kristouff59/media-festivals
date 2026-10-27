@@ -11,7 +11,9 @@ const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
 assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
 const db = [];
-const sourceHTML = "<html><body><h1>Grand Festival 2027</h1>" +
+let publicationDate = new Date(Date.now() - 86400000).toISOString();
+let sourceHTML = '<html><head><meta property="article:published_time" content="' +
+  publicationDate + '"></head><body><h1>Grand Festival 2027</h1>' +
   "Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027. " +
   "Le festival Grand Festival annonce les artistes sur sa page officielle dès ce matin. " +
   "Vendredi 18 juin 2027 Rock Un et Rock Deux. ".repeat(5) + "</body></html>";
@@ -99,4 +101,23 @@ assert.equal(openaiCalls, 2, "Une recherche et une rédaction, pas plus");
 assert.equal(insertedDraft.status, "pending", "Aucune publication automatique");
 assert.equal(insertedDraft.payload.article.sources[0].url, "https://grandfestival.example/programme");
 assert.equal(runUpdates, 1);
+// Une annonce ancienne ou sans date de publication doit être écartée.
+const recentMeta = '<meta property="article:published_time" content="' + publicationDate + '">';
+sourceHTML = sourceHTML.replace(recentMeta,
+  '<meta property="article:published_time" content="2025-11-17T10:00:00Z">');
+openaiCalls = 0;
+insertedDraft = null;
+const stale = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
+assert.equal(stale.status, 200);
+assert.equal((await stale.json()).result, "aucune_source_officielle_verifiee");
+assert.equal(openaiCalls, 1, "Une annonce ancienne ne doit pas être rédigée");
+assert.equal(insertedDraft, null, "Ne pas soumettre une vieille annonce");
+
+sourceHTML = sourceHTML.replace('content="2025-11-17T10:00:00Z"', 'content=""');
+openaiCalls = 0;
+const undated = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
+assert.equal((await undated.json()).result, "aucune_source_officielle_verifiee");
+assert.equal(openaiCalls, 1, "Une page sans date n'autorise pas la rédaction");
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
