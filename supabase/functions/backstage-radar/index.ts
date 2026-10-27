@@ -425,9 +425,14 @@ async function officialFestivalSignals() {
       const content = plain(html);
       if (content.length < 90) return null;
       const lower = content.toLowerCase();
-      const markers = ["programmation 2027", "line-up 2027", "lineup 2027",
-        "premiers noms", "latest news", "recent stories", "meest recente verhalen",
-        "programmation", "2027"];
+      // Pour Cabaret Vert, se placer près de la liste d'artistes, et non
+      // près du lien de navigation "Programmation" présent dans le menu.
+      const markers = source.name === "Cabaret Vert"
+        ? ["toutes les scènes", "premiers noms", "programmation 2027",
+           "programmation", "2027"]
+        : ["programmation 2027", "line-up 2027", "lineup 2027",
+           "premiers noms", "latest news", "recent stories",
+           "meest recente verhalen", "programmation", "2027"];
       let offset = 0;
       for (const marker of markers) {
         const index = lower.indexOf(marker);
