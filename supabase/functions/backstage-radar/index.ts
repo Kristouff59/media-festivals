@@ -44,7 +44,24 @@ function parseOutput(text) {
   if (first < 0 || last <= first) throw Error("Sortie JSON absente");
   return JSON.parse(text.slice(first, last + 1));
 }
-async function openai(prompt, web) {
+// Journal privé : mêmes prompts et mêmes réponses que les appels déjà payés.
+// L'écriture Supabase ne sollicite jamais OpenAI et n'altère pas la veille.
+async function saveOpenAILog(key, entry) {
+  if (!key || !entry.slot) return;
+  try {
+    await data("editorial_ai_logs", key, "POST", [{
+      ...entry,
+      request_text: String(entry.request_text || "").slice(0, 16000),
+      response_text: String(entry.response_text || "").slice(0, 16000),
+      error_detail: String(entry.error_detail || "").slice(0, 600),
+    }], "return=minimal");
+  } catch (error) {
+    // Une migration non installée ou une panne de journal ne doit jamais
+    // provoquer un nouvel appel IA ni annuler une proposition valide.
+    console.error("Journal OpenAI non enregistré :", String(error).slice(0, 180));
+  }
+}
+async function openai(prompt, web, key, slot) {
   const req = {
     model, input: prompt, store: false,
     reasoning: { effort: "low" }, max_output_tokens: web ? 3000 : 4500,
@@ -53,24 +70,50 @@ async function openai(prompt, web) {
     req.tools = [{ type: "web_search", search_context_size: "medium" }];
     req.tool_choice = "required";
     // Trois recherches maximum pour couvrir plusieurs univers musicaux.
-    // Coût API encadré : un seul appel de découverte puis un appel de rédaction.
+    // Coût API encadré : un appel de découverte puis, si utile, une rédaction.
     req.max_tool_calls = 3;
   } else req.text = { format: { type: "json_object" } };
-  const r = await fetch(api, {
-    method: "POST", signal: AbortSignal.timeout(50000),
-    headers: { Authorization: "Bearer " + env("OPENAI_API_KEY"), "Content-Type": "application/json" },
-    body: JSON.stringify(req),
-  });
-  if (!r.ok) throw Error("OpenAI HTTP " + r.status + " : " + (await r.text()).slice(0, 160));
-  const result = await r.json();
-  if (result.status !== "completed") throw Error("OpenAI non terminé");
-  if (web && !result.output?.some(x => x.type === "web_search_call")) {
-    throw Error("Recherche Web absente");
+  const started = Date.now();
+  let responseData = null, responseText = "", resultStatus = "error", errorDetail = "";
+  try {
+    const r = await fetch(api, {
+      method: "POST", signal: AbortSignal.timeout(50000),
+      headers: { Authorization: "Bearer " + env("OPENAI_API_KEY"), "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    if (!r.ok) throw Error("OpenAI HTTP " + r.status + " : " + (await r.text()).slice(0, 160));
+    responseData = await r.json();
+    if (responseData.status !== "completed") throw Error("OpenAI non terminé");
+    if (web && !responseData.output?.some(x => x.type === "web_search_call")) {
+      throw Error("Recherche Web absente");
+    }
+    responseText = (responseData.output || []).filter(x => x.type === "message")
+      .flatMap(x => x.content || []).filter(x => x.type === "output_text")
+      .map(x => x.text || "").join("");
+    const parsed = parseOutput(responseText);
+    resultStatus = "completed";
+    return parsed;
+  } catch (error) {
+    errorDetail = String(error instanceof Error ? error.message : error)
+      .replace(/(?:sk-[A-Za-z0-9_-]+|sb_secret_[A-Za-z0-9_-]+)/g, "[CLE_MASQUEE]");
+    throw error;
+  } finally {
+    const usage = responseData?.usage || {};
+    await saveOpenAILog(key, {
+      slot, stage: web ? "decouverte" : "redaction",
+      status: resultStatus,
+      model: String(responseData?.model || model).slice(0, 100),
+      request_text: prompt,
+      response_text: responseText,
+      error_detail: errorDetail,
+      openai_response_id: responseData?.id ? String(responseData.id).slice(0, 140) : null,
+      input_tokens: Math.max(0, Number(usage.input_tokens) || 0),
+      output_tokens: Math.max(0, Number(usage.output_tokens) || 0),
+      reasoning_tokens: Math.max(0, Number(usage.output_tokens_details?.reasoning_tokens) || 0),
+      web_search_calls: (responseData?.output || []).filter(x => x.type === "web_search_call").length,
+      duration_ms: Math.max(0, Date.now() - started),
+    });
   }
-  const text = (result.output || []).filter(x => x.type === "message")
-    .flatMap(x => x.content || []).filter(x => x.type === "output_text")
-    .map(x => x.text || "").join("");
-  return parseOutput(text);
 }
 function officialUrl(raw) {
   try {
@@ -337,7 +380,7 @@ async function run(key) {
       "Donne jusqu'à SIX pistes distinctes, classées par potentiel éditorial. " +
       "La qualité prime la quantité : de zéro à six pistes, jamais de quota à remplir. " +
       "candidates:[] si aucune actualité récente ne mérite réellement un article.",
-      true
+      true, key, slot
     );
     if (!Array.isArray(discovery.candidates)) throw Error("Aucun tableau de sujets");
     let chosen = null;
@@ -402,7 +445,7 @@ async function run(key) {
       '{"name":"Nom","city":"Ville","country":"France","dates":"dates annoncées",'+
       '"editionYear":2027,"lineup":[{"day":"Jour et date","artists":["Artiste 1","Artiste 2"]}]}. ' +
       "N'inscris rien d'invérifiable dans le texte ou la fiche festival.",
-      false
+      false, key, slot
     );
     if (!articleValid(article, proof.source)) {
       outcome = "article_ecarte_controle_qualite";
