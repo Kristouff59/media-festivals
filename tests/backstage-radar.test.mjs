@@ -80,7 +80,9 @@ async function fakeFetch(url, options = {}) {
   }
   if (address.includes("/rest/v1/editorial_drafts?select=id&limit=1")) return answer([]);
   if (address.includes("cabaretvert.com/programmation/"))
-    return new Response('<html><body><h1>Cabaret Vert 2027</h1><p>Premiers noms Fontaines D.C. et Angèle</p></body></html>',
+    return new Response('<html><body><h1>Cabaret Vert 2027</h1><p>Premiers noms Fontaines D.C. et Angèle. ' +
+      'Le festival annonce les premiers artistes pour son édition 2027 à Charleville-Mézières. ' +
+      'Les nouveaux noms sont affichés dans la programmation officielle et des annonces suivront.</p></body></html>',
       { status:200, headers:{"content-type":"text/html"} });
   if (address.includes("liveandshootmag.com/"))
     return new Response('<html><head><meta property="article:published_time" content="' +
