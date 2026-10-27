@@ -30,7 +30,12 @@ textarea{min-height:125px;resize:vertical;line-height:1.5}
 #radar-diagnostics{margin:12px 0;background:var(--card);padding:14px 16px;border:1px solid var(--stroke);border-radius:10px}
 #radar-diagnostics summary{cursor:pointer;font-weight:700;color:var(--accent)}
 #radar-diagnostics p{line-height:1.6;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
-#ai-logs-panel{margin:16px 0 10px}
+#ai-logs-panel,#sources-panel{margin:16px 0 10px}
+#sources-panel>summary{cursor:pointer;font-size:17px;font-weight:750}
+#source-registry-list{display:grid;gap:8px;margin-top:12px}
+.source-registry-item{padding:10px 12px;background:#141b18;border:1px solid var(--stroke);border-radius:9px}
+.source-registry-item strong{font-size:14px}
+.source-registry-item p{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.45}
 #ai-logs-panel>summary{cursor:pointer;font-size:17px;font-weight:750}
 #ai-logs-panel .ai-log{background:#141b18;border:1px solid var(--stroke);border-radius:9px;padding:12px;margin:10px 0}
 #ai-logs-panel .ai-log summary{cursor:pointer;font-size:14px;font-weight:700;line-height:1.6}
@@ -92,6 +97,11 @@ textarea{min-height:125px;resize:vertical;line-height:1.5}
 <summary>Journal privé des appels OpenAI <span id="ai-logs-count" class="pill">Chargement…</span></summary>
 <p class="muted">Uniquement les appels déjà effectués. Aucun token OpenAI n'est consommé pour consulter ce journal. Historique conservé 30 jours.</p>
 <div id="ai-log-list"></div>
+</details>
+<details id="sources-panel" class="panel">
+<summary>Sources officielles découvertes et suivies <span class="pill" id="sources-count">Chargement…</span></summary>
+<p class="muted">Liste évolutive : les nouvelles sources vérifiées sont ajoutées automatiquement. Le radar continue aussi de chercher sur tout le Web.</p>
+<div id="source-registry-list"></div>
 </details>
 <div id="layout"><div id="drafts"></div><article id="preview" class="panel article"><p class="empty">Sélectionnez un article pour le lire.</p></article></div>
 </section>
@@ -186,6 +196,46 @@ for(const d of drafts){const b=document.createElement('button');b.className='dra
 if(!drafts.length)$('drafts').innerHTML='<p class="empty">Aucun article en attente. Le radar musical continue sa veille.</p>';
 showPreview();
 }
+async function loadSources(){
+const container=$('source-registry-list');
+container.replaceChildren();
+const {data:rows,error}=await client.from('editorial_sources')
+  .select('host,name,site_url,origin,status,verified_articles,last_verified_at,last_checked_at')
+  .order('last_verified_at',{ascending:false,nullsFirst:false}).limit(100);
+if(error){
+  $('sources-count').textContent='Non configuré';
+  const p=document.createElement('p');
+  p.textContent='Installer la migration-dynamic-sources.sql pour activer les sources évolutives.';
+  container.append(p);
+  return;
+}
+$('sources-count').textContent=(rows||[]).length+' source(s) affichée(s)';
+if(!rows?.length){
+  const p=document.createElement('p');
+  p.textContent='Aucune source enregistrée. La recherche Web ouverte fonctionne même sans cette liste.';
+  container.append(p);
+  return;
+}
+for(const src of rows){
+  const div=document.createElement('div');
+  div.className='source-registry-item';
+  const name=document.createElement('strong');
+  name.textContent=src.name;
+  div.append(name);
+  const meta=document.createElement('p');
+  meta.textContent=(src.origin==='discovered'?'Découverte automatiquement':'Source de départ')+
+    ' · '+(src.status==='paused'?'En pause':'Suivie')+
+    ' · '+src.verified_articles+' article(s) vérifié(s)';
+  div.append(meta);
+  const link=document.createElement('a');
+  link.href=src.site_url;
+  link.target='_blank';
+  link.rel='noopener noreferrer';
+  link.textContent=src.host;
+  div.append(link);
+  container.append(div);
+}
+}
 async function loadAiLogs(){
 const container=$('ai-log-list');
 container.replaceChildren();
@@ -270,7 +320,7 @@ if(!radar.error && radar.data?.length){
 }
 if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
 showList();
-await loadAiLogs();
+await Promise.all([loadAiLogs(),loadSources()]);
 }
 async function decide(row,status){
 if(busy||row.status!=='pending')return;
