@@ -267,7 +267,7 @@ Les pages de programmation officielles, souvent non datées, étaient
 aussi rejetées même si un communiqué ou une nouvelle presse confirmait
 l'ajout d'un artiste.
 
-### Sources désormais consultées directement, à chaque passage
+### Sources servant initialement d'amorçage, sans liste fermée
 
 - Cabaret Vert : `https://cabaretvert.com/programmation/`
 - Rock Werchter : `https://www.rockwerchter.be/en/news`
@@ -280,7 +280,9 @@ l'ajout d'un artiste.
 - Rock en Seine : `https://www.rockenseine.com/`
 - Pukkelpop : `https://www.pukkelpop.be/en/`
 
-Ces pages sont téléchargées **directement** par le radar, en parallèle.
+Les pages actives du registre sont contrôlées **directement** par
+le radar à tour de rôle (12 maximum par passage) ; la liste peut désormais
+s'agrandir automatiquement.
 Leurs extraits sont ajoutés au prompt de la recherche Web OpenAI
 existante. Il n'y a **pas d'appel OpenAI supplémentaire**, mais le
 prompt étant enrichi, le coût en tokens d'entrée peut légèrement
@@ -327,6 +329,60 @@ Installer la dernière version GitHub de
 code GitHub ne déploient pas la fonction Supabase automatiquement.
 La migration SQL du journal reste valable : il n'y a pas de nouvelle
 migration à exécuter pour ces sources.
+
+## Sources ouvertes et apprentissage automatique (28 octobre 2026)
+
+**Principe clé : aucune liste fixe ne limite les recherches.**
+OpenAI cherche à chaque passage sur l'ensemble du Web des événements,
+annonces de programmation et concerts dignes d'un article pour BACKSTAGE.
+Le registre Supabase sert uniquement de **mémoire de sources fiables
+déjà rencontrées**, qui peuvent suggérer des pistes supplémentaires.
+
+### Activation
+
+1. Dans **Supabase → SQL Editor**, exécuter une seule fois
+   [`supabase/migration-dynamic-sources.sql`](supabase/migration-dynamic-sources.sql).
+   Le script crée `editorial_sources` avec une politique RLS réservée
+   aux administrateurs, deux RPC réservés au service serveur, et insère
+   dix sources de démarrage **facultatives**, uniquement si elles sont absentes.
+   Aucune préférence, aucun brouillon et aucune donnée de journal existante
+   ne sont supprimés.
+2. Dans **Supabase → Edge Functions → backstage-radar**, remplacer
+   le code avec la
+   [dernière version GitHub](supabase/functions/backstage-radar/index.ts),
+   puis cliquer sur **Deploy updates**.
+3. Recharger [l'espace rédaction](https://kristouff59.github.io/media-festivals/admin/)
+   et ouvrir **« Sources officielles découvertes et suivies »** pour
+   voir leur croissance. Une nouvelle source apparaît après une future
+   proposition d'article vérifiée, jamais à partir d'une simple intuition
+   du modèle.
+
+### Comportement précis
+
+- Recherche générale OpenAI sur **tous les festivals et artistes,
+  sans restriction géographique ou de domaine**.
+- En parallèle, consultation directe d'au plus **12 sites** déjà
+  enregistrés par passage (sans appel OpenAI supplémentaire).
+- Les 12 suivants sont sélectionnés lors du passage suivant grâce
+  à une rotation sur la date de dernier contrôle : pas d'avantage
+  permanent pour les 10 premières sources.
+- Lorsque le radar a vérifié une annonce et **créé un brouillon privé**,
+  le domaine de son site officiel est enregistré automatiquement
+  (`origin=discovered`). Il sera proposé à la rotation dès les
+  prochains passages. Une simple source médiatique, une piste non
+  recoupée ou un article rejeté pour manque de preuves ne suffit pas
+  à ajouter un site.
+- La rotation concerne seulement les visites directes ; **aucun
+  site non enregistré n'est exclu de la recherche Web**.
+- Si la migration est absente ou si le registre n'est pas disponible,
+  la recherche OpenAI ouverte continue, sans apprentissage persistant.
+- Les entrées de départ et les nouvelles sources sont visibles
+  uniquement dans le tableau de bord authentifié (RLS).
+
+**Attention :** la découverte de nouvelles sources ne garantit
+ni un article à chaque passage, ni la publication automatique.
+La sélection éditoriale reste prioritaire, et chaque brouillon
+attend toujours l'approbation humaine.
 
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
