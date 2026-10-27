@@ -330,7 +330,7 @@ code GitHub ne déploient pas la fonction Supabase automatiquement.
 La migration SQL du journal reste valable : il n'y a pas de nouvelle
 migration à exécuter pour ces sources.
 
-## Sources ouvertes et apprentissage automatique (28 octobre 2026)
+## Sources ouvertes et apprentissage automatique (27 octobre 2026)
 
 **Principe clé : aucune liste fixe ne limite les recherches.**
 OpenAI cherche à chaque passage sur l'ensemble du Web des événements,
