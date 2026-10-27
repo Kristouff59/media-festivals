@@ -81,6 +81,47 @@ Refuser depuis `/admin/` le premier brouillon Simple Plan s'il annonce
 Après redéploiement, utiliser d'abord une requête de santé
 `{"healthcheck":true}`, puis programmer Supabase Cron.
 
+## Mémoire éditoriale : pourquoi un article est refusé
+
+À partir du 27 octobre 2026, BACKSTAGE propose un refus motivé :
+
+- Motif classé : artiste, ligne éditoriale, angle, style, fiabilité,
+  actualité ou autre.
+- Commentaire libre : ce que vous ne voulez pas, ce que vous souhaiteriez
+  davantage voir, ou comment améliorer le texte.
+- Case **« Tenir compte de mon avis dans les prochains articles »**,
+  cochée par défaut. Pour un refus isolé, décochez-la.
+- Bouton **« Refuser sans commentaire »** toujours disponible.
+- L'avis est visible uniquement dans `/admin/` pour le compte
+  administrateur. Il n'est jamais joint à l'article public.
+
+### Activation de la mémoire
+
+1. Dans **Supabase → SQL Editor**, exécuter le contenu intégral du script
+   [`supabase/migration-editorial-feedback.sql`](supabase/migration-editorial-feedback.sql).
+   Il crée la table privée `editorial_feedback`, sa politique de lecture
+   limitée aux administrateurs et une fonction transactionnelle
+   `reject_editorial_draft_with_feedback`. Il ne supprime rien.
+2. Dans **Supabase → Edge Functions → backstage-radar → Code**, remplacer
+   le code par [la dernière version de `index.ts`](supabase/functions/backstage-radar/index.ts)
+   puis **Deploy updates**. Les changements GitHub ne redéploient pas
+   les Edge Functions à eux seuls.
+3. Sur [`/admin/`](https://kristouff59.github.io/media-festivals/admin/),
+   rafraîchir le navigateur, choisir un article en attente, et tester
+   **Refuser et expliquer pourquoi**.
+
+Lors du prochain passage du radar, il consulte (côté serveur) au plus
+24 retours récents, uniquement ceux cochés pour application future.
+Ils sont placés dans le contexte des requêtes OpenAI **pour la sélection
+du sujet et pour la rédaction**. Ils ne changent pas les poids du modèle
+d'IA : il s'agit d'une mémoire modifiable conservée dans Supabase.
+Le refus et l'enregistrement du commentaire sont une transaction
+indivisible : en cas d'erreur, l'article reste en attente.
+
+Les contrôles sur l'ancienneté, les sources officielles et la publication
+uniquement après validation restent obligatoires et ne peuvent pas être
+écartés par un retour éditorial.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
