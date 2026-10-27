@@ -138,7 +138,11 @@ insertedDraft = null;
 const stale = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
 assert.equal(stale.status, 200);
-assert.equal((await stale.json()).result, "aucune_source_officielle_verifiee");
+const staleReport = await stale.json();
+assert.equal(staleReport.result, "aucune_source_officielle_verifiee");
+assert.equal(staleReport.candidates_found, 1);
+assert.equal(staleReport.rejections[0].reason, "annonce_trop_ancienne");
+assert.ok(staleReport.rejections[0].topic.includes("Grand Festival"));
 assert.equal(openaiCalls, 1, "Une annonce ancienne ne doit pas être rédigée");
 assert.equal(insertedDraft, null, "Ne pas soumettre une vieille annonce");
 
@@ -146,6 +150,21 @@ sourceHTML = sourceHTML.replace('content="2025-11-17T10:00:00Z"', 'content=""');
 openaiCalls = 0;
 const undated = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
-assert.equal((await undated.json()).result, "aucune_source_officielle_verifiee");
+const undatedReport = await undated.json();
+assert.equal(undatedReport.result, "aucune_source_officielle_verifiee");
+assert.equal(undatedReport.rejections[0].reason, "date_publication_absente");
 assert.equal(openaiCalls, 1, "Une page sans date n'autorise pas la rédaction");
+sourceHTML = sourceHTML.replace('content=""',
+  'content="' + new Date(Date.now()-86400000).toISOString() + '"');
+sourceHTML = sourceHTML.replace(
+  "Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027.",
+  "La phrase attendue par le modèle est absente de la page."
+);
+openaiCalls = 0;
+const missingQuote = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
+assert.equal(missingQuote.status, 200);
+assert.equal((await missingQuote.json()).rejections[0].reason, "citations_non_retrouvees");
+assert.equal(openaiCalls, 1, "Une citation manquante empêche la rédaction");
+
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
