@@ -307,18 +307,35 @@ async function run(key) {
     let chosen = null;
     const rejectionDetails = [];
     for (const news of discovery.candidates.slice(0, 3)) {
+      const title = typeof news?.topic === "string" ? news.topic.slice(0, 120) : "Sujet non identifié";
+      const report = reason => rejectionDetails.push({ topic: title, reason });
       if (!news || typeof news.topic !== "string" || news.topic.length < 20 ||
           typeof news.topic_key !== "string" ||
-          !/^[a-z0-9-]{12,130}$/.test(news.topic_key) ||
-          existingKeys.has(news.topic_key)) continue;
+          !/^[a-z0-9-]{12,130}$/.test(news.topic_key)) {
+        report("candidat_invalide");
+        continue;
+      }
+      if (existingKeys.has(news.topic_key)) {
+        report("sujet_deja_traite");
+        continue;
+      }
       try {
-        const proof = await verify(news);
+        const diagnostic = {};
+        const proof = await verify(news, diagnostic);
         if (proof) { chosen = { news, proof }; break; }
-      } catch (_) { /* source officielle indisponible : sujet suivant */ }
+        report(diagnostic.reason || "source_non_verifiee");
+      } catch (_) {
+        report("source_inaccessible");
+      }
     }
     if (!chosen) {
       outcome = "aucune_source_officielle_verifiee";
-      return { result: outcome };
+      const report = { result: outcome,
+        candidates_found: discovery.candidates.length,
+        rejections: rejectionDetails };
+      // Garder aussi un résumé exploitable par l'administration.
+      outcome = JSON.stringify(report).slice(0, 440);
+      return report;
     }
     const { news, proof } = chosen;
     const article = await openai(
