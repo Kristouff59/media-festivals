@@ -111,9 +111,26 @@ function officialPublishedDate(html) {
   }
   for (const tag of html.match(/<time\b[^>]*>/gi) || []) {
     if (!/itemprop\s*=\s*["']datePublished["']/i.test(tag) &&
-        !/\bpubdate\b/i.test(tag)) continue;
+        !/\bpubdate\b/i.test(tag) &&
+        !/\b(?:published|entry-date|post-date|publication-date)\b/i.test(tag)) continue;
     const m = tag.match(/\bdatetime\s*=\s*["']([^"']+)["']/i);
     if (m) candidates.push(m[1]);
+  }
+  // Certaines pages officielles affichent leur date à côté du titre sans
+  // datePublished/metadata (ex. « 15 OCTOBER 2026 1 MIN READ »).
+  // Ne jamais extraire n'importe quelle date : elle pourrait désigner
+  // l'événement plutôt que la publication de l'annonce.
+  const heading = html.match(/<h1\b[^>]*>[\s\S]*?<\/h1>/i);
+  if (heading) {
+    const start = html.indexOf(heading[0]);
+    const vicinity = plain(html.slice(Math.max(0, start - 1800),
+      Math.min(html.length, start + heading[0].length + 1800)));
+    // Date explicitement associée au temps de lecture de l'article.
+    const readTimeDate = /(\b\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+20\d{2})\s+(?:\d{1,2}\s+MIN(?:UTE)?S?\s+READ\b)/gi;
+    for (const found of vicinity.matchAll(readTimeDate)) candidates.push(found[1]);
+    // Date précédée d'un marqueur explicite de publication, non de concert.
+    const markedDate = /\b(?:published|posted|published\s+on|posted\s+on|publication\s+date)\s*:?\s*(\d{1,2}\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+20\d{2})\b/gi;
+    for (const found of vicinity.matchAll(markedDate)) candidates.push(found[1]);
   }
   const dates = candidates.map(x => Date.parse(String(x))).filter(Number.isFinite);
   if (!dates.length) return { value: null, reason: "date_publication_absente" };
@@ -303,6 +320,8 @@ async function run(key) {
       "littéralement observée sur la page officielle dans quotes, ou quotes:[] si la citation " +
       "est introuvable. Il vaut mieux rendre une piste imparfaite que renvoyer une liste vide " +
       "par excès de prudence. N'invente jamais une URL ni un extrait. " +
+      "Distingue une annonce originale de tournée et les nouvelles dates ajoutées récemment : " +
+      "ne recycle pas un lancement vieux de 10 ou 15 jours comme s'il datait d'aujourd'hui. " +
       "Une page de billetterie ancienne ne prouve pas une annonce nouvelle. " +
       "RÉPONDS UNIQUEMENT EN JSON, sans Markdown : " +
       '{"candidates":[{"topic":"Annonce précise récente",'+
