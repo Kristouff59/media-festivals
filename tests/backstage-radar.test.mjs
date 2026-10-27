@@ -8,6 +8,12 @@ const source = fs.readFileSync("supabase/functions/backstage-radar/index.ts", "u
 new vm.Script(source, { filename: "backstage-radar/index.ts" });
 const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
 const feedbackMigration = fs.readFileSync("supabase/migration-editorial-feedback.sql", "utf8");
+const aiLogMigration = fs.readFileSync("supabase/migration-ai-logs.sql","utf8");
+assert.match(aiLogMigration,/create table if not exists public\.editorial_ai_logs/i);
+assert.match(aiLogMigration,/enable row level security/i);
+assert.match(aiLogMigration,/create policy editorial_ai_logs_admin_read/i);
+assert.match(aiLogMigration,/revoke all on public\.editorial_ai_logs from anon, authenticated/i);
+assert.match(aiLogMigration,/interval '30 days'/i);
 assert.match(feedbackMigration, /create table if not exists public\.editorial_feedback/i);
 assert.match(feedbackMigration, /enable row level security/i);
 assert.match(feedbackMigration, /create policy editorial_feedback_admin_read/i);
@@ -18,6 +24,8 @@ assert.match(feedbackMigration, /status = 'rejected'/i);
 assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
 let emptyDiscovery = false;
+let logWriteError = false;
+const savedLogs = [];
 const prompts = [];
 const editorialReturns = [
   { article_title:"Concert XYZ", category:"artiste",
@@ -57,6 +65,11 @@ async function fakeFetch(url, options = {}) {
   if (address.includes("/rest/v1/editorial_radar_runs?on_conflict=slot")) return answer([{ slot: "2026-10-26-matin" }], 201);
   if (address.includes("/rest/v1/editorial_drafts?select=topic_key")) return answer([]);
   if (address.includes("/rest/v1/editorial_feedback?select=")) return answer(editorialReturns);
+  if (address.endsWith("/rest/v1/editorial_ai_logs")) {
+    if (logWriteError) return answer({ message:"Test de panne du journal" }, 503);
+    savedLogs.push(...JSON.parse(options.body));
+    return answer(null, 204);
+  }
   if (address.includes("/rest/v1/editorial_drafts?on_conflict=topic_key")) {
     insertedDraft = JSON.parse(options.body)[0];
     return answer([{ id: "test" }], 201);
@@ -72,7 +85,10 @@ async function fakeFetch(url, options = {}) {
     const params = JSON.parse(options.body);
     prompts.push(params.input);
     openaiCalls++;
-    if (params.tools) return answer({ status: "completed", output: [
+    if (params.tools) return answer({ status: "completed",
+      id: "resp-test-decouverte", model:"test-mini",
+      usage:{input_tokens:150,output_tokens:75,output_tokens_details:{reasoning_tokens:10}},
+      output: [
       { type: "web_search_call" },
       { type: "message", content: [{ type: "output_text",
         text: JSON.stringify({ candidates: emptyDiscovery ? [] : [{
@@ -84,7 +100,9 @@ async function fakeFetch(url, options = {}) {
           festival_name: "Grand Festival",
         }] }) }] },
     ] });
-    return answer({ status: "completed", output: [{ type: "message",
+    return answer({ status: "completed", id:"resp-test-redaction", model:"test-mini",
+      usage:{input_tokens:350,output_tokens:200,output_tokens_details:{reasoning_tokens:20}},
+      output: [{ type: "message",
       content: [{ type: "output_text", text: JSON.stringify(story) }] }] });
   }
   throw Error("Accès réseau non prévu dans le test : " + address);
@@ -133,17 +151,34 @@ const unauth = await handler(new Request("https://project.supabase.co/functions/
   { method: "POST", headers: { apikey: "invalid" }, body: "{}" }));
 assert.equal(unauth.status, 401);
 assert.equal(openaiCalls, 0, "Une requête non autorisée ne coûte rien");
+assert.equal(savedLogs.length, 0, "Aucun log OpenAI d'une requête non autorisée");
 const health = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: env.SUPABASE_SECRET_KEYS ? "sb_secret_test_only_nonproduction" : "?" },
     body: JSON.stringify({ healthcheck: true }) }));
 assert.equal(health.status, 200);
 assert.equal((await health.json()).db, "ok");
+assert.equal(savedLogs.length, 0, "Le healthcheck ne contacte pas OpenAI et ne crée pas de log");
 const trigger = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
 const result = await trigger.json();
 assert.equal(trigger.status, 200, JSON.stringify(result));
 assert.equal(result.result, "article_a_valider");
 assert.equal(openaiCalls, 2, "Une recherche et une rédaction, pas plus");
+assert.equal(savedLogs.length, 2, "Chaque appel déjà existant est journalisé");
+assert.equal(savedLogs[0].stage, "decouverte");
+assert.equal(savedLogs[1].stage, "redaction");
+assert.equal(savedLogs[0].input_tokens, 150);
+assert.equal(savedLogs[0].output_tokens, 75);
+assert.equal(savedLogs[0].reasoning_tokens, 10);
+assert.equal(savedLogs[0].web_search_calls, 1);
+assert.equal(savedLogs[1].input_tokens, 350);
+assert.equal(savedLogs[1].output_tokens, 200);
+assert.ok(savedLogs[0].request_text.includes("nouvelles annonces post-punk"));
+assert.ok(savedLogs[0].response_text.includes("Grand Festival"));
+assert.ok(savedLogs.every(l=>l.status==="completed"));
+assert.ok(!savedLogs.some(l=>JSON.stringify(l).includes("sk-test-fake") ||
+  JSON.stringify(l).includes("sb_secret_test_only_nonproduction")), 
+  "Aucune clé dans les logs");
 assert.ok(prompts[0].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la découverte");
 assert.ok(prompts[1].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la rédaction");
 assert.ok(!prompts[0].includes("Ce rejet est ponctuel"), "Un refus ponctuel n'est pas transmis");
@@ -154,9 +189,11 @@ assert.equal(runUpdates, 1);
 // Aucun feedback n'est envoyé si le rédacteur choisit de ne pas l'appliquer.
 editorialReturns[0].apply_to_future=false;
 prompts.length=0;
+logWriteError=true;
 const noMemory = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
-assert.equal(noMemory.status, 200);
+assert.equal(noMemory.status, 200, "Une panne Supabase du journal n'interrompt pas la veille");
+logWriteError=false;
 assert.ok(!prompts.some(p=>p.includes("nouvelles annonces post-punk")),
   "L'avis décoché est exclu même après un précédent usage");
 // Une annonce ancienne ou sans date de publication doit être écartée.
@@ -202,6 +239,7 @@ assert.equal(openaiCalls, 1, "Une citation manquante empêche la rédaction");
 emptyDiscovery = true;
 openaiCalls = 0;
 insertedDraft = null;
+const logsBeforeEmpty=savedLogs.length;
 const noCandidates = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
   { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body: "{}" }));
 assert.equal(noCandidates.status, 200);
@@ -212,6 +250,7 @@ assert.equal(emptyReport.checked, 0);
 assert.equal(emptyReport.discovery_status, "no_candidates_returned");
 assert.equal(emptyReport.rejections.length, 0);
 assert.equal(openaiCalls, 1, "Pas de rédaction payante sans sujet");
+assert.equal(savedLogs.length, logsBeforeEmpty+1, "Une recherche vide reste journalisée");
 assert.equal(insertedDraft, null, "Pas de création d'article à partir d'une recherche vide");
 
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
