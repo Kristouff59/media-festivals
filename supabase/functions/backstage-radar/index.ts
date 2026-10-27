@@ -183,6 +183,77 @@ function officialPublishedDate(html) {
   if (age > 7 * 86400000) return { value: null, reason: "annonce_trop_ancienne" };
   return { value: new Date(published).toISOString().slice(0, 10), reason: null };
 }
+// Preuve datée de secours : un article de presse récent + le programme
+// officiel confirmant explicitement les mêmes artistes et le même festival.
+// Cela couvre les pages "programmation" sans datePublished, sans prendre
+// leur simple existence pour une annonce nouvelle.
+const trustedPressHosts = [
+  "liveandshootmag.com", "infoconcert.com", "rjrradio.fr",
+  "radio8fm.com", "esprit-festivalier.fr", "lebonbon.fr",
+  "nova.fr", "radiofrance.fr", "franceinfo.fr", "lesinrocks.com",
+  "rocksound.tv", "lavoixdunord.fr", "nme.com", "kerrang.com",
+  "hardrockmag.fr", "rollingstone.fr", "loudwire.com",
+  "metalhammer.com", "louderthanwar.com", "festivalier.net",
+];
+function pressURL(raw) {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.port || url.username || url.password)
+      return null;
+    const host = url.hostname.toLowerCase();
+    if (!trustedPressHosts.some(x => host === x || host.endsWith("." + x))) return null;
+    url.hash = "";
+    return url.toString();
+  } catch (_) { return null; }
+}
+function datedNewsHeader(html) {
+  const headline = html.search(/<h1\b/i);
+  if (headline < 0) return null;
+  const intro = plain(html.slice(Math.max(0, headline - 300), headline + 2000));
+  // En l'absence de JSON-LD, certains magazines affichent uniquement
+  // "26 octobre 2026" juste à côté du titre de l'article.
+  const french = intro.match(/\b([0-3]?\d)\s+(janvier|février|fevrier|mars|avril|mai|juin|juillet|août|aout|septembre|octobre|novembre|décembre|decembre)\s+(20\d{2})\b/i);
+  const digits = intro.match(/\b([0-3]?\d)[/.-]([01]?\d)[/.-](20\d{2})\b/);
+  const months = ["janvier","fevrier","mars","avril","mai","juin",
+    "juillet","aout","septembre","octobre","novembre","decembre"];
+  const month = french && months.indexOf(norm(french[2])) + 1;
+  const day = french ? Number(french[1]) : digits ? Number(digits[1]) : null;
+  const m = french ? month : digits ? Number(digits[2]) : null;
+  const year = french ? Number(french[3]) : digits ? Number(digits[3]) : null;
+  if (!day || !m || !year || m < 1 || m > 12) return null;
+  const date = Date.UTC(year, m - 1, day);
+  if (new Date(date).getUTCDate() !== day) return null;
+  const age = Date.now() - date;
+  if (age < -86400000 || age > 7*86400000) return null;
+  return new Date(date).toISOString().slice(0, 10);
+}
+async function recentPressCorroboration(news, officialContent) {
+  const url = pressURL(news.press_url);
+  const artistNames = Array.isArray(news.announced_artists)
+    ? news.announced_artists.filter(x => typeof x === "string" && norm(x).length >= 5)
+      .slice(0, 10) : [];
+  const festival = norm(news.festival_name);
+  if (!url || festival.length < 5 || !artistNames.length ||
+      !officialContent.includes(festival)) return null;
+  const resp = await fetch(url, {
+    redirect: "error", signal: AbortSignal.timeout(9000),
+    headers: { Accept: "text/html", "User-Agent": "BACKSTAGE-editorial-check/1.0" },
+  });
+  if (!resp.ok || !/html/i.test(resp.headers.get("content-type") || "") ||
+      Number(resp.headers.get("content-length") || 0) > 700000) return null;
+  const html = await resp.text();
+  if (html.length > 700000) return null;
+  const pressText = norm(plain(html));
+  if (pressText.length < 250 || !pressText.includes(festival)) return null;
+  const supportedArtists = artistNames.filter(x => {
+    const name = norm(x);
+    return officialContent.includes(name) && pressText.includes(name);
+  });
+  if (!supportedArtists.length) return null;
+  const date = officialPublishedDate(html).value || datedNewsHeader(html);
+  if (!date) return null;
+  return { url, published: date, artist_names: supportedArtists };
+}
 async function verify(news, diagnostic = {}) {
   const reject = reason => { diagnostic.reason = reason; return null; };
   const url = officialUrl(news.official_url);
@@ -199,7 +270,6 @@ async function verify(news, diagnostic = {}) {
   const html = await r.text();
   if (html.length > 1200000) return reject("source_trop_volumineuse");
   const publication = officialPublishedDate(html);
-  if (!publication.value) return reject(publication.reason);
   const source = plain(html), normalized = norm(source);
   if (normalized.length < 250) return reject("source_trop_courte");
   // Le modèle n'est pas une preuve : citer une phrase retrouvée textuellement.
@@ -209,7 +279,14 @@ async function verify(news, diagnostic = {}) {
   const tokens = norm(news.festival_name || news.topic).split(" ").filter(t => t.length > 4);
   if (tokens.length && !tokens.some(t => normalized.includes(t)))
     return reject("sujet_absent_de_la_source");
-  return { url, source, published: publication.value };
+  let corroboration = null;
+  if (!publication.value && publication.reason === "date_publication_absente") {
+    try { corroboration = await recentPressCorroboration(news, normalized); }
+    catch (_) { /* une source secondaire en échec ne suffit jamais */ }
+  }
+  if (!publication.value && !corroboration) return reject(publication.reason);
+  return { url, source, published: publication.value || corroboration.published,
+    corroboration_url: corroboration?.url || null };
 }
 function articleValid(a, source) {
   if (!a || typeof a.title !== "string" || a.title.length < 22 || a.title.length > 140 ||
@@ -416,6 +493,11 @@ async function run(key) {
       "N'affirme pas qu'une date ou une citation est vérifiée si tu ne l'as pas observée. " +
       "La présence d'un champ datePublished dans la page officielle sera vérifiée ENSUITE par notre programme : " +
       "tu n'as PAS à garantir toi-même cette métadonnée, ni à éliminer une piste faute de la voir. " +
+      "Si la page officielle de PROGRAMMATION ne date pas ses ajouts, " +
+      "trouve aussi une page de PRESSE datée des 7 derniers jours sur le MÊME nouvel artiste " +
+      "et le MÊME festival. Renseigne press_url (URL réelle, pas inventée) et " +
+      "announced_artists (noms explicitement confirmés sur les deux pages). " +
+      "La rédaction ne sera autorisée que si le programme officiel et le média corroborent l'annonce. " +
       "De même, les citations exactes seront contrôlées ensuite : indique au moins UNE phrase " +
       "littéralement observée sur la page officielle dans quotes, ou quotes:[] si la citation " +
       "est introuvable. Une piste peut manquer de métadonnées sans être abandonnée, " +
@@ -433,7 +515,9 @@ async function run(key) {
       '"why_now":"Élément nouvellement annoncé",'+
       '"official_url":"https://site-officiel/page-ou-chaine-vide",'+
       '"quotes":["citation exacte si disponible"],'+
-      '"festival_name":"Nom du festival ou chaîne vide"}]}. ' +
+      '"festival_name":"Nom du festival ou chaîne vide",'+
+      '"press_url":"https://media-fiable.fr/article-date-ou-chaine-vide",'+
+      '"announced_artists":["Artiste officiellement confirmé"]}]}. ' +
       "Donne jusqu'à SIX pistes distinctes, classées par potentiel éditorial. " +
       "La qualité prime la quantité : de zéro à six pistes, jamais de quota à remplir. " +
       "candidates:[] si aucune actualité récente ne mérite réellement un article.",
@@ -518,7 +602,10 @@ async function run(key) {
       format: article.category === "SOCIÉTÉ" ? "DÉCRYPTAGE" : "ACTUALITÉ",
       readMinutes: Math.max(2, Math.round(count(prose) / 210)),
       visual: "visual-b", artword: "LIVE", byline: "BACKSTAGE · La rédaction",
-      sources: [{ label: "Annonce officielle", url: proof.url }],
+      sources: [{ label: "Programme officiel", url: proof.url },
+        ...(proof.corroboration_url
+          ? [{ label: "Annonce datée recoupée dans la presse", url: proof.corroboration_url }]
+          : [])],
     };
     const payload = { article: row, previous: null,
       festivals: festivalChanges(article.festival, proof.source, proof.url) };
