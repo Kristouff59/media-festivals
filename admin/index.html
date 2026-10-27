@@ -30,6 +30,13 @@ textarea{min-height:125px;resize:vertical;line-height:1.5}
 #radar-diagnostics{margin:12px 0;background:var(--card);padding:14px 16px;border:1px solid var(--stroke);border-radius:10px}
 #radar-diagnostics summary{cursor:pointer;font-weight:700;color:var(--accent)}
 #radar-diagnostics p{line-height:1.6;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
+#ai-logs-panel{margin:16px 0 10px}
+#ai-logs-panel>summary{cursor:pointer;font-size:17px;font-weight:750}
+#ai-logs-panel .ai-log{background:#141b18;border:1px solid var(--stroke);border-radius:9px;padding:12px;margin:10px 0}
+#ai-logs-panel .ai-log summary{cursor:pointer;font-size:14px;font-weight:700;line-height:1.6}
+#ai-logs-panel .ai-log p,#ai-log-list>p{color:var(--muted);font-size:13px;line-height:1.5}
+#ai-logs-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow-y:auto;background:#0d100f;border:1px solid var(--stroke);padding:12px;border-radius:7px;font:12px/1.5 ui-monospace,Consolas,monospace;color:var(--text)}
+#ai-logs-panel .ai-label{font-weight:700;margin-top:14px;color:var(--accent);font-size:13px}
 #rejection-editor label{display:block;margin:12px 0 6px;font-weight:700}
 #rejection-editor .small-help{font:13px/1.5 Inter,"Segoe UI",sans-serif;color:var(--muted);margin:5px 0 14px}
 .feedback-switch{display:flex!important;align-items:start;gap:10px;line-height:1.4;max-width:650px}
@@ -81,6 +88,11 @@ textarea{min-height:125px;resize:vertical;line-height:1.5}
 <section id="workspace" hidden>
 <div class="row"><span id="counter" class="pill">0 article en attente</span><span id="radar-state" class="pill">Veille Supabase non encore activée</span><button class="secondary" id="refresh">Actualiser</button></div>
 <details id="radar-diagnostics" hidden><summary>Pourquoi aucun article n'a-t-il été proposé ?</summary><p id="radar-diagnostic-text"></p></details>
+<details id="ai-logs-panel" class="panel">
+<summary>Journal privé des appels OpenAI <span id="ai-logs-count" class="pill">Chargement…</span></summary>
+<p class="muted">Uniquement les appels déjà effectués. Aucun token OpenAI n'est consommé pour consulter ce journal. Historique conservé 30 jours.</p>
+<div id="ai-log-list"></div>
+</details>
 <div id="layout"><div id="drafts"></div><article id="preview" class="panel article"><p class="empty">Sélectionnez un article pour le lire.</p></article></div>
 </section>
 </main>
@@ -174,6 +186,59 @@ for(const d of drafts){const b=document.createElement('button');b.className='dra
 if(!drafts.length)$('drafts').innerHTML='<p class="empty">Aucun article en attente. Le radar musical continue sa veille.</p>';
 showPreview();
 }
+async function loadAiLogs(){
+const container=$('ai-log-list');
+container.replaceChildren();
+const {data:logs,error}=await client.from('editorial_ai_logs')
+ .select('id,slot,stage,status,model,request_text,response_text,error_detail,openai_response_id,input_tokens,output_tokens,reasoning_tokens,web_search_calls,duration_ms,created_at')
+ .order('created_at',{ascending:false}).limit(30);
+if(error){
+  $('ai-logs-count').textContent='Non configuré';
+  const p=document.createElement('p');
+  p.textContent='Journal indisponible : installer migration-ai-logs.sql dans Supabase puis redéployer backstage-radar.';
+  container.append(p);
+  return;
+}
+$('ai-logs-count').textContent=(logs||[]).length+' appel(s) enregistré(s)';
+if(!logs?.length){
+  const p=document.createElement('p');
+  p.textContent='Aucun appel enregistré pour le moment. Le journal démarre lors du prochain passage du radar après son déploiement.';
+  container.append(p);
+  return;
+}
+for(const entry of logs){
+  const box=document.createElement('details');
+  box.className='ai-log';
+  const heading=document.createElement('summary');
+  const date=new Date(entry.created_at).toLocaleString('fr-FR');
+  const phase=entry.stage==='decouverte'?'Recherche Web':'Rédaction';
+  const tokens=(entry.input_tokens||0)+(entry.output_tokens||0);
+  heading.textContent=date+' · '+phase+' · '+(entry.status==='completed'?'Terminé':'Erreur')+
+    ' · '+tokens.toLocaleString('fr-FR')+' tokens';
+  box.append(heading);
+  const metadata=document.createElement('p');
+  metadata.textContent='Créneau : '+entry.slot+' · Modèle : '+entry.model+
+    ' · Entrée : '+entry.input_tokens+' · Sortie : '+entry.output_tokens+
+    ' · Raisonnement inclus dans la sortie : '+entry.reasoning_tokens+
+    ' · Recherches Web : '+entry.web_search_calls+
+    ' · Durée : '+(entry.duration_ms/1000).toFixed(1)+' s';
+  box.append(metadata);
+  for(const [title,content] of [
+    ['Requête réellement envoyée à OpenAI',entry.request_text],
+    ['Réponse reçue',entry.response_text],
+    ['Erreur éventuelle',entry.error_detail]
+  ]){
+    if(!content)continue;
+    const label=document.createElement('div');
+    label.className='ai-label';
+    label.textContent=title;
+    const pre=document.createElement('pre');
+    pre.textContent=content;
+    box.append(label,pre);
+  }
+  container.append(box);
+}
+}
 async function load(){
 const {data,error}=await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload').order('created_at',{ascending:false}).limit(60);
 if(error){setMessage('Lecture impossible : '+error.message);return}
@@ -205,6 +270,7 @@ if(!radar.error && radar.data?.length){
 }
 if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
 showList();
+await loadAiLogs();
 }
 async function decide(row,status){
 if(busy||row.status!=='pending')return;
