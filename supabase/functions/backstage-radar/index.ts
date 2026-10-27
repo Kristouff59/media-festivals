@@ -318,8 +318,12 @@ async function run(key) {
       "tu n'as PAS à garantir toi-même cette métadonnée, ni à éliminer une piste faute de la voir. " +
       "De même, les citations exactes seront contrôlées ensuite : indique au moins UNE phrase " +
       "littéralement observée sur la page officielle dans quotes, ou quotes:[] si la citation " +
-      "est introuvable. Il vaut mieux rendre une piste imparfaite que renvoyer une liste vide " +
-      "par excès de prudence. N'invente jamais une URL ni un extrait. " +
+      "est introuvable. Une piste peut manquer de métadonnées sans être abandonnée, " +
+      "mais elle doit avoir un VRAI intérêt journalistique. N'invente jamais une URL ni un extrait. " +
+      "Ne propose RIEN simplement pour remplir le site : " +
+      "ni petites annonces banales ni répétitions de tournées, ni artistes sans angle pertinent. " +
+      "Si aucun sujet n'est suffisamment neuf, important ou intéressant pour la ligne éditoriale, " +
+      "réponds candidates:[] ; c'est un résultat normal et souhaitable. " +
       "Distingue une annonce originale de tournée et les nouvelles dates ajoutées récemment : " +
       "ne recycle pas un lancement vieux de 10 ou 15 jours comme s'il datait d'aujourd'hui. " +
       "Une page de billetterie ancienne ne prouve pas une annonce nouvelle. " +
@@ -331,7 +335,8 @@ async function run(key) {
       '"quotes":["citation exacte si disponible"],'+
       '"festival_name":"Nom du festival ou chaîne vide"}]}. ' +
       "Donne jusqu'à SIX pistes distinctes, classées par potentiel éditorial. " +
-      "candidates:[] seulement si aucune actualité récente crédible n'a été trouvée.",
+      "La qualité prime la quantité : de zéro à six pistes, jamais de quota à remplir. " +
+      "candidates:[] si aucune actualité récente ne mérite réellement un article.",
       true
     );
     if (!Array.isArray(discovery.candidates)) throw Error("Aucun tableau de sujets");
