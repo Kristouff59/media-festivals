@@ -24,6 +24,7 @@ assert.match(feedbackMigration, /status = 'rejected'/i);
 assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
 let emptyDiscovery = false;
+let pressConfirmation = false;
 let logWriteError = false;
 const savedLogs = [];
 const prompts = [];
@@ -78,6 +79,16 @@ async function fakeFetch(url, options = {}) {
     runUpdates++;return answer(null, 204);
   }
   if (address.includes("/rest/v1/editorial_drafts?select=id&limit=1")) return answer([]);
+  if (address.includes("cabaretvert.com/programmation/"))
+    return new Response('<html><body><h1>Cabaret Vert 2027</h1><p>Premiers noms Fontaines D.C. et Angèle</p></body></html>',
+      { status:200, headers:{"content-type":"text/html"} });
+  if (address.includes("liveandshootmag.com/"))
+    return new Response('<html><head><meta property="article:published_time" content="' +
+      new Date(Date.now()-86400000).toISOString() +
+      '"></head><body><h1>Grand Festival 2027 : Rock Un rejoint le festival</h1>' +
+      '<p>Grand Festival annonce Rock Un en 2027. ' + 
+      'Un nouvel artiste est officiellement confirmé par les organisateurs. '.repeat(7) + '</p></body></html>',
+      { status:200, headers:{"content-type":"text/html"} });
   if (address.includes("grandfestival.example")) return new Response(sourceHTML, {
     status: 200, headers: { "content-type": "text/html" },
   });
@@ -98,6 +109,8 @@ async function fakeFetch(url, options = {}) {
           official_url: "https://grandfestival.example/programme",
           quotes: ["Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027."],
           festival_name: "Grand Festival",
+          press_url: pressConfirmation ? "https://www.liveandshootmag.com/grand-festival-2027/" : "",
+          announced_artists: pressConfirmation ? ["Rock Un"] : [],
         }] }) }] },
     ] });
     return answer({ status: "completed", id:"resp-test-redaction", model:"test-mini",
@@ -180,6 +193,8 @@ assert.ok(!savedLogs.some(l=>JSON.stringify(l).includes("sk-test-fake") ||
   JSON.stringify(l).includes("sb_secret_test_only_nonproduction")), 
   "Aucune clé dans les logs");
 assert.ok(prompts[0].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la découverte");
+assert.ok(prompts[0].includes("Cabaret Vert"), "Une source officielle prioritaire est incluse dans la recherche");
+assert.ok(prompts[0].includes("Fontaines D.C."), "Les premiers noms trouvés sur le site officiel guident la découverte");
 assert.ok(prompts[1].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la rédaction");
 assert.ok(!prompts[0].includes("Ce rejet est ponctuel"), "Un refus ponctuel n'est pas transmis");
 assert.ok(!prompts[1].includes("Ce rejet est ponctuel"), "Le refus ponctuel est aussi absent de la rédaction");
@@ -252,5 +267,36 @@ assert.equal(emptyReport.rejections.length, 0);
 assert.equal(openaiCalls, 1, "Pas de rédaction payante sans sujet");
 assert.equal(savedLogs.length, logsBeforeEmpty+1, "Une recherche vide reste journalisée");
 assert.equal(insertedDraft, null, "Pas de création d'article à partir d'une recherche vide");
+
+// Une page officielle de programmation sans date peut être corroborée
+// par un média connu, daté récemment et confirmant le même artiste.
+emptyDiscovery = false;
+pressConfirmation = true;
+sourceHTML = sourceHTML.replace('La phrase attendue par le modèle est absente de la page.',
+ "Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027.");
+sourceHTML = sourceHTML.replace(/<meta property="article:published_time" content="[^"]*">/, "");
+openaiCalls = 0;
+insertedDraft = null;
+const withPress = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method: "POST", headers: { apikey: "sb_secret_test_only_nonproduction" }, body:"{}" }));
+const pressResult = await withPress.json();
+assert.equal(withPress.status,200,JSON.stringify(pressResult));
+assert.equal(pressResult.result, "article_a_valider", JSON.stringify(pressResult));
+assert.equal(insertedDraft.payload.article.sources.length, 2,
+ "Le programme officiel et l'article de presse daté sont tous deux cités");
+assert.match(insertedDraft.payload.article.sources[1].url,/liveandshootmag/);
+assert.equal(openaiCalls,2, "La corroboration ne déclenche pas de requête OpenAI supplémentaire");
+
+// Une source de presse récente ne doit JAMAIS blanchir un vieux
+// communiqué de lancement officiellement daté.
+sourceHTML=sourceHTML.replace("</head>",
+ '<meta property="article:published_time" content="2025-11-17T10:00:00Z"></head>');
+openaiCalls=0;
+insertedDraft=null;
+const noFalseFresh = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  { method:"POST",headers:{apikey:"sb_secret_test_only_nonproduction"},body:"{}" }));
+assert.equal((await noFalseFresh.json()).rejections[0].reason,"annonce_trop_ancienne");
+assert.equal(openaiCalls,1);
+assert.equal(insertedDraft,null);
 
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
