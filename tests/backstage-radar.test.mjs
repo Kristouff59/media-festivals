@@ -6,6 +6,9 @@ import { webcrypto } from "node:crypto";
 
 const source = fs.readFileSync("supabase/functions/backstage-radar/index.ts", "utf8");
 new vm.Script(source, { filename: "backstage-radar/index.ts" });
+const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
+// ON CONFLICT (topic_key) exige un index unique non partiel pour l'upsert PostgREST.
+assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
 const db = [];
 const sourceHTML = "<html><body><h1>Grand Festival 2027</h1>" +
