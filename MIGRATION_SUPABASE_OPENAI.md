@@ -258,6 +258,76 @@ Une panne de son écriture ne doit ni générer d'appel supplémentaire,
 ni empêcher la validation des sources et la création des brouillons.
 Les anciennes veilles ne peuvent pas être reconstruites rétroactivement.
 
+## Radar de sources officielles prioritaires (27 octobre 2026)
+
+**Pourquoi l'annonce du Cabaret Vert a été manquée :**
+la veille initiale faisait une recherche OpenAI générale et ne possédait
+**aucune liste de sources officielles à consulter systématiquement**.
+Les pages de programmation officielles, souvent non datées, étaient
+aussi rejetées même si un communiqué ou une nouvelle presse confirmait
+l'ajout d'un artiste.
+
+### Sources désormais consultées directement, à chaque passage
+
+- Cabaret Vert : `https://cabaretvert.com/programmation/`
+- Rock Werchter : `https://www.rockwerchter.be/en/news`
+- Graspop Metal Meeting : `https://press.graspop.be/`
+- Eurockéennes : `https://www.eurockeennes.fr/actualites/`
+- We Love Green : `https://www.welovegreen.fr/music/`
+- Main Square : `https://mainsquarefestival.fr/`
+- Hellfest : `https://hellfest.fr/`
+- Dour : `https://www.dourfestival.eu/`
+- Rock en Seine : `https://www.rockenseine.com/`
+- Pukkelpop : `https://www.pukkelpop.be/en/`
+
+Ces pages sont téléchargées **directement** par le radar, en parallèle.
+Leurs extraits sont ajoutés au prompt de la recherche Web OpenAI
+existante. Il n'y a **pas d'appel OpenAI supplémentaire**, mais le
+prompt étant enrichi, le coût en tokens d'entrée peut légèrement
+augmenter. Les sites en erreur, vides ou inaccessibles sont ignorés
+sans bloquer les autres sources.
+
+Ces dix festivals ne constituent **pas une limite géographique** :
+l'exploration générale des tournées, festivals internationaux et
+enjeux de la musique live reste en place.
+
+### Pages officielles sans date, mais annonces récentes
+
+Si un programme officiel n'affiche aucune date de mise en ligne,
+un sujet peut désormais être corroboré par **une page d'article récente**
+sur une liste explicite de médias musicaux réputés, à condition que :
+
+1. l'article de presse possède une date de publication datant de sept
+   jours au maximum ;
+2. le même festival et au moins un même artiste nommé apparaissent
+   explicitement dans la presse **et** dans le programme officiel ;
+3. la page officielle contient bien une citation littéralement
+   vérifiable fournie par la recherche ;
+4. aucune ancienne date de publication explicite n'apparaisse sur
+   l'annonce officielle (une annonce officiellement ancienne ne peut
+   pas être rajeunie par la presse).
+
+Le brouillon conserve les **deux URLs** comme sources et attend toujours
+la décision du rédacteur. La simple présence d'un groupe sur une
+affiche ne prouve jamais qu'il vient d'être annoncé.
+
+La réponse JSON du radar indique maintenant
+`official_sources_reached`, qui liste **les sites prioritaires réellement
+accessibles** pendant l'exécution. L'onglet des journaux OpenAI
+enregistre aussi la liste des extraits consultés.
+
+**Aucune publication automatique n'a été ajoutée** ; une veille sans
+actualité intéressante peut toujours se terminer sans article.
+
+### Déploiement
+
+Installer la dernière version GitHub de
+`supabase/functions/backstage-radar/index.ts` dans l'Edge Function
+`backstage-radar` puis cliquer sur **Deploy updates**. Le site et le
+code GitHub ne déploient pas la fonction Supabase automatiquement.
+La migration SQL du journal reste valable : il n'y a pas de nouvelle
+migration à exécuter pour ces sources.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
