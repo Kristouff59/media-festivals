@@ -20,7 +20,10 @@ end $$;
 
 select cron.schedule(
   'backstage-radar-matin-soir',
-  '17 7,18 * * *', -- UTC, 2 fois par jour (l'heure française varie avec l'heure d'été)
+  '0 5,6,16,17 * * *', -- créneaux UTC possibles pour 07:00/18:00 à Paris
+  -- pg_cron reste en UTC : ce filtre exécute la requête HTTP uniquement
+  -- à 07 h et 18 h heure de Paris, hiver comme été. Les deux autres
+  -- passages SQL sont des opérations sans réseau et sans coût OpenAI.
   $job$
     select net.http_post(
       url := 'https://vvwkkgpahrsojmpteexz.supabase.co/functions/v1/backstage-radar',
@@ -34,7 +37,8 @@ select cron.schedule(
       ),
       body := '{"source":"cron"}'::jsonb,
       timeout_milliseconds := 130000
-    );
+    )
+    where extract(hour from now() at time zone 'Europe/Paris') in (7,18);
   $job$
 );
 
