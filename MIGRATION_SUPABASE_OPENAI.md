@@ -420,8 +420,11 @@ attend toujours l'approbation humaine.
    Ce test est susceptible de **déclencher des frais API**.
 6. Lorsque la fonction répond normalement, exécuter
    [`supabase/schedule-radar.sql`](https://github.com/Kristouff59/media-festivals/blob/main/supabase/schedule-radar.sql).
-   Le cron lance la fonction à **07 h 17 et 18 h 17 UTC**. Les heures
-   affichées en France changent avec l'heure d'été.
+   Le cron déclenche le radar à **07 h 00 et 18 h 00, heure de Paris**,
+   été comme hiver. Pour tenir compte du changement d'heure, le
+   planificateur UTC propose quatre créneaux SQL possibles, mais une
+   condition de fuseau Europe/Paris limite les appels HTTP à deux par
+   jour. Les passages hors horaires ne sollicitent pas OpenAI.
 7. **Désactiver ensuite le vieux calendrier GitHub Actions `veille.yml`**,
    afin d'éviter les recherches en double. Le code reste sur GitHub,
    mais l'automatisation éditoriale n'en dépend plus.
