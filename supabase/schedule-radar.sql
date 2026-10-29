@@ -2,13 +2,24 @@
 -- en place des secrets OPENAI_API_KEY et Supabase Vault.
 -- Clé privée : ne jamais coller sa valeur dans GitHub ni dans cette conversation.
 --
--- Dans SQL Editor, exécuter UNE FOIS en remplaçant LE_SECRET uniquement :
--- select vault.create_secret('VOTRE_CLE_sb_secret_...', 'backstage_cron_secret');
+-- Créer d'abord dans l'interface Database > Vault > Secrets un secret
+-- nommé backstage_cron_secret avec pour valeur la clé serveur sb_secret_....
+-- Ne jamais écrire cette clé dans ce fichier, les logs ou un message.
 --
 -- L'URL du projet public est connue ; la clé serveur ne figure jamais ici.
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 create extension if not exists supabase_vault;
+
+-- Échec explicite si la clé n'a pas été enregistrée dans Vault.
+do $
+begin
+  if not exists (
+    select 1 from vault.secrets where name = 'backstage_cron_secret'
+  ) then
+    raise exception 'Créer le secret backstage_cron_secret dans Supabase Vault avant de planifier la veille';
+  end if;
+end $;
 
 -- Supprimer l'ancien job homonyme au cas où il existe, pour éviter des doublons.
 do $$
