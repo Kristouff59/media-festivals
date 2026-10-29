@@ -12,14 +12,14 @@ create extension if not exists pg_net;
 create extension if not exists supabase_vault;
 
 -- Échec explicite si la clé n'a pas été enregistrée dans Vault.
-do $
+do $$
 begin
   if not exists (
     select 1 from vault.secrets where name = 'backstage_cron_secret'
   ) then
     raise exception 'Créer le secret backstage_cron_secret dans Supabase Vault avant de planifier la veille';
   end if;
-end $;
+end $$;
 
 -- Supprimer l'ancien job homonyme au cas où il existe, pour éviter des doublons.
 do $$
