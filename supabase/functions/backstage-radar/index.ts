@@ -401,24 +401,45 @@ function editorialMemory(rows) {
 // suffisantes pour publier : chaque URL sera contrôlée séparément.
 function recentOfficialHeadlines(content, now = Date.now()) {
   const output = [], seen = new Set();
-  const datePattern = /\b([0-3]?\d)[\/. -]([01]?\d)[\/. -](20\d{2})\b/g;
-  for (const found of content.matchAll(datePattern)) {
-    const day = Number(found[1]), month = Number(found[2]), year = Number(found[3]);
-    if (month < 1 || month > 12) continue;
-    const date = Date.UTC(year, month - 1, day);
-    if (new Date(date).getUTCDate() !== day || new Date(date).getUTCMonth() !== month-1) continue;
+  const take = (index, label, year, month, day) => {
+    if (month < 1 || month > 12 || day < 1 || day > 31) return;
+    let date = Date.UTC(year,month-1,day);
+    if (new Date(date).getUTCDate() !== day || new Date(date).getUTCMonth() !== month-1) return;
+    // Un sommaire écrit « 28 oct » sans année : durant la première
+    // semaine de janvier, « 30 déc » désigne l'année précédente.
+    if (date > now + 86400000 && !/\b20\d{2}\b/.test(label)) date=Date.UTC(year-1,month-1,day);
     const age = now - date;
-    if (age < -86400000 || age > 7 * 86400000) continue;
-    const text = content.slice(Math.max(0, found.index - 175),
-      Math.min(content.length, found.index + found[0].length + 105));
-    const signature = new Date(date).toISOString().slice(0, 10) + "|" + norm(text).slice(0, 65);
+    if (age < -86400000 || age > 7 * 86400000) return;
+    const snippet = content.slice(Math.max(0,index - 150),
+      Math.min(content.length,index + label.length + 110)).trim();
+    const dateKey = new Date(date).toISOString().slice(0,10);
+    const signature = dateKey + "|" + norm(snippet).slice(0,65);
     if (!seen.has(signature)) {
       seen.add(signature);
-      output.push({ date: new Date(date).toISOString().slice(0,10), context: text.trim() });
+      output.push({ date: dateKey, context: snippet });
     }
+  };
+  const numeric = /\b([0-3]?\d)[\/. -]([01]?\d)[\/. -](20\d{2})\b/g;
+  for (const match of content.matchAll(numeric)) {
+    take(match.index,match[0],Number(match[3]),Number(match[2]),Number(match[1]));
   }
-  // Les annonces récentes d'abord : si Graspop publie le 28 octobre,
-  // le billet blink-182 du 19 octobre ne doit jamais masquer la nouveauté.
+  const months = {
+    jan:1,janv:1,january:1,janvier:1, feb:2,fev:2,fevr:2,
+    february:2,fevrier:2, mar:3,mars:3,march:3, apr:4,avr:4,
+    april:4,avril:4, may:5,mai:5, jun:6,juin:6,june:6,
+    jul:7,juillet:7,july:7, aug:8,aou:8,aout:8,august:8,
+    sep:9,sept:9,september:9,septembre:9,
+    oct:10,okt:10,october:10,octobre:10,
+    nov:11,november:11,novembre:11,
+    dec:12,december:12,decembre:12,dez:12,
+  };
+  const monthName = /\b([0-3]?\d)\s+(janv?\.?|january|janvier|f[eé]v(?:r(?:ier)?)?\.?|feb(?:ruary)?|mars?|march|avr(?:il)?\.?|apr(?:il)?|mai|may|juin|jun(?:e)?|juil(?:let)?\.?|jul(?:y)?|ao[uû]t|aug(?:ust)?|sep(?:t(?:embre)?)?\.?|september|oct(?:obre|ober)?|okt|nov(?:embre|ember)?|d[eé]c(?:embre|ember)?|dec(?:ember)?|dez)\s*(20\d{2})?\b/gi;
+  for (const match of content.matchAll(monthName)) {
+    const m = months[norm(match[2]).replace(/\.$/,"")];
+    if (m) take(match.index,match[0],Number(match[3] || new Date(now).getUTCFullYear()),m,Number(match[1]));
+  }
+  // Si un festival a publié de nouveaux noms le 28 et le 26 octobre,
+  // l'ancien communiqué du 19 ne doit pas monopoliser le résultat.
   return output.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
 }
 // La veille reste ouverte : OpenAI cherche sur TOUT le Web. Les sites
