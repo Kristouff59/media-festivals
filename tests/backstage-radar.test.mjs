@@ -202,6 +202,12 @@ assert.ok(!JSON.stringify(headlines).includes("2026-10-19"),
 const onlyOld = vm.runInNewContext(
   'recentOfficialHeadlines("19/10/2026 première tête d’affiche",Date.UTC(2026,9,30))',ctx);
 assert.equal(onlyOld.length,0);
+const datesSansAnnee = vm.runInNewContext(
+  'recentOfficialHeadlines("28 oct Nouvelle tête d’affiche 26 okt Autre annonce 19 oct blink-182",Date.UTC(2026,9,30))',ctx);
+assert.equal(datesSansAnnee.length,2,"Actualités officielles en FR et NL sans année");
+assert.equal(datesSansAnnee[0].date,"2026-10-28");
+assert.equal(datesSansAnnee[1].date,"2026-10-26");
+
 // Pages de news officielles sans métadonnées, mais avec une date affichée
 // dans l'en-tête du billet à côté de son temps de lecture.
 function datedHeading(daysAgo) {
