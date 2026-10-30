@@ -77,7 +77,7 @@ async function openai(prompt, web, key, slot) {
   let responseData = null, responseText = "", resultStatus = "error", errorDetail = "";
   try {
     const r = await fetch(api, {
-      method: "POST", signal: AbortSignal.timeout(web ? 48000 : 75000),
+      method: "POST", signal: AbortSignal.timeout(web ? 40000 : 65000),
       headers: { Authorization: "Bearer " + env("OPENAI_API_KEY"), "Content-Type": "application/json" },
       body: JSON.stringify(req),
     });
@@ -303,6 +303,21 @@ function articleValid(a, source) {
   for (const year of (a.title + paragraphs.join(" ")).match(/\b20\d\d\b/g) || []) {
     if (!source.includes(year)) return false;
   }
+  return true;
+}
+// Dans un lot, interdire qu'un article sur un festival ou un artiste
+// se retrouve associé à la preuve officielle d'un AUTRE sujet.
+function articleMatchesTopic(article, news, proof) {
+  const paragraphs = [...(article.body || []),
+    ...(article.sections || []).flatMap(x=>x.paragraphs || [])].join(" ");
+  const text = norm([article.title,article.excerpt,paragraphs].join(" "));
+  const festivalName = norm(news.festival_name || "");
+  if (festivalName.length >= 5 && norm(proof.source).includes(festivalName) &&
+      !text.includes(festivalName)) return false;
+  const artistNames = (Array.isArray(news.announced_artists)
+    ? news.announced_artists : []).filter(x=>typeof x === "string" &&
+      norm(x).length >= 4 && norm(proof.source).includes(norm(x))).slice(0,12);
+  if (artistNames.length && !artistNames.some(x=>text.includes(norm(x)))) return false;
   return true;
 }
 function festivalChanges(f, source, url) {
@@ -774,7 +789,8 @@ async function run(key) {
       }
       writtenKeys.add(match.news.topic_key);
       const { news, proof } = match;
-      if (!articleValid(article, proof.source)) {
+      if (!articleValid(article, proof.source) ||
+          !articleMatchesTopic(article, news, proof)) {
         rejectionDetails.push({ topic: news.topic.slice(0,120),
           reason: "article_ecarte_controle_qualite" });
         continue;
