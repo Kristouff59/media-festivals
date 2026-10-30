@@ -384,6 +384,51 @@ ni un article à chaque passage, ni la publication automatique.
 La sélection éditoriale reste prioritaire, et chaque brouillon
 attend toujours l'approbation humaine.
 
+## Correctif du 30 octobre 2026 — mieux détecter les vraies nouveautés
+
+**Diagnostic du lancement automatique de 07 h 00** : le radar a bien
+appelé OpenAI, mais la recherche a consommé **19 869 tokens d'entrée**
+et retourné une seule piste, l'annonce blink-182 du **19 octobre**.
+Le refus comme `annonce_trop_ancienne` était justifié. Toutefois,
+Graspop avait annoncé de nouvelles têtes d'affiche les **21, 23, 26 et
+28 octobre**. Le défaut était dans la **découverte et le classement**,
+pas dans le filtre de fraîcheur.
+
+Changements apportés à `supabase/functions/backstage-radar/index.ts` :
+
+- Les pages de sources officielles déjà enregistrées sont toujours
+  contrôlées à tour de rôle, **sans limiter la recherche aux sites
+  connus**.
+- Extraction locale, **sans coût API**, d'au plus cinq dates récentes
+  par page. Formats acceptés : `28/10/2026`, `28 oct`, `26 okt`,
+  `28 October 2026`, etc. Une date de concert n'est jamais suffisante
+  pour autoriser la publication ; les indices ne servent qu'à la
+  **découverte**.
+- Ces indices datés, triés de la plus récente à la plus ancienne, sont
+  envoyés au même appel OpenAI existant. La consigne explicite la
+  fenêtre précise des sept derniers jours et exige de chercher les
+  **nouvelles annonces**, pas simplement le premier communiqué
+  historique d'un festival.
+- `web_search.search_context_size` passe de `medium` à `low`,
+  pour limiter les tokens d'entrée liés aux résultats Web. Le nombre
+  d'appels effectifs dépend encore du fonctionnement de l'outil OpenAI ;
+  aucune économie exacte n'est garantie.
+- Toujours **une seule requête de découverte OpenAI** et, uniquement
+  si une preuve récente est validée, une requête de rédaction.
+  Un résultat vide reste accepté, sans publication artificielle.
+
+Les tests utilisent un faux sommaire Graspop contenant une annonce du
+19 octobre et de nouveaux communiqués des jours suivants. Aucun
+appel payant n'est effectué par ces tests.
+
+**À redéployer impérativement** : copier le code actuel de
+`supabase/functions/backstage-radar/index.ts` dans l'éditeur de
+Supabase Edge Functions → `backstage-radar` puis **Deploy updates**.
+Le Cron existant à 07 h et 18 h **reste actif** et ne nécessite aucune
+nouvelle migration SQL. Ne pas réinitialiser les anciens créneaux
+uniquement pour tester les logs ; la prochaine exécution prendra en
+compte ce code si elle est déployée au préalable.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
