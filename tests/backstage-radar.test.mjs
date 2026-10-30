@@ -12,6 +12,8 @@ assert.match(source, /async function activeEditorialSources\(key\)/,
   "La liste évolutive provient de la base de données");
 assert.match(source, /const WATCH_PER_RUN\s*=\s*12/,
   "Contrôle borné par passage avec rotation des sites");
+assert.match(source, /search_context_size: "low"/,
+  "Limiter le volume des résultats Web sans supprimer la recherche ouverte");
 
 const migration = fs.readFileSync("supabase/migration-radar.sql", "utf8");
 const feedbackMigration = fs.readFileSync("supabase/migration-editorial-feedback.sql", "utf8");
@@ -45,7 +47,9 @@ const learnedSources=[];
 const monitoredHosts=[];
 const watchedSources = [
   {host:"cabaretvert.com",name:"Cabaret Vert",
-    site_url:"https://cabaretvert.com/programmation/",source_kind:"festival"}
+    site_url:"https://cabaretvert.com/programmation/",source_kind:"festival"},
+  {host:"graspop.be",name:"Graspop Metal Meeting",
+    site_url:"https://press.graspop.be/en",source_kind:"festival"}
 ];
 const prompts = [];
 const editorialReturns = [
@@ -116,6 +120,19 @@ async function fakeFetch(url, options = {}) {
     runUpdates++;return answer(null, 204);
   }
   if (address.includes("/rest/v1/editorial_drafts?select=id&limit=1")) return answer([]);
+  if (address.includes("press.graspop.be/en")) {
+    const day = offset => {
+      const d=new Date(Date.now()-offset*86400000);
+      return String(d.getUTCDate()).padStart(2,"0") + "/" +
+        String(d.getUTCMonth()+1).padStart(2,"0")+"/"+d.getUTCFullYear();
+    };
+    return new Response('<html><body><h1>Graspop Metal Meeting news</h1>'+
+      '<h2>The first headliner for Sunday 20 June!</h2><time>'+day(2)+'</time>'+
+      '<h2>A new headliner for Saturday 19 June!</h2><time>'+day(4)+'</time>'+
+      '<h2>First headliner: blink-182</h2><time>'+day(12)+'</time>'+
+      '<p>Festival news for 2027: new rock and metal headlines this week.</p></body></html>',
+      {status:200,headers:{"content-type":"text/html"}});
+  }
   if (address.includes("cabaretvert.com/programmation/"))
     return new Response('<html><body><h1>Cabaret Vert 2027</h1><p>Premiers noms Fontaines D.C. et Angèle. ' +
       'Le festival annonce les premiers artistes pour son édition 2027 à Charleville-Mézières. ' +
@@ -170,6 +187,21 @@ const ctx = {
   URL, Response, console, Date, JSON,
 };
 vm.runInNewContext(source, ctx);
+// Un fil officiel contient parfois plusieurs communiqués : 28 et 26 octobre
+// doivent prévaloir sur l'annonce initiale du 19 octobre.
+const sourceIndex = '<h2>Nouvelle tête d’affiche</h2>28/10/2026 '+
+  '<h2>Deuxième annonce</h2>26/10/2026 '+
+  '<h2>blink-182 première tête d’affiche</h2>19/10/2026';
+const headlines = vm.runInNewContext(
+  'recentOfficialHeadlines('+JSON.stringify(sourceIndex)+',Date.UTC(2026,9,30))',ctx);
+assert.equal(headlines.length,2,"Annonces du 28 et du 26 dans la période de 7 jours");
+assert.equal(headlines[0].date,"2026-10-28");
+assert.equal(headlines[1].date,"2026-10-26");
+assert.ok(!JSON.stringify(headlines).includes("2026-10-19"),
+  "L'ancienne annonce du 19 octobre ne doit pas être retenue");
+const onlyOld = vm.runInNewContext(
+  'recentOfficialHeadlines("19/10/2026 première tête d’affiche",Date.UTC(2026,9,30))',ctx);
+assert.equal(onlyOld.length,0);
 // Pages de news officielles sans métadonnées, mais avec une date affichée
 // dans l'en-tête du billet à côté de son temps de lecture.
 function datedHeading(daysAgo) {
@@ -234,6 +266,10 @@ assert.ok(!savedLogs.some(l=>JSON.stringify(l).includes("sk-test-fake") ||
 assert.ok(prompts[0].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la découverte");
 assert.ok(prompts[0].includes("Cabaret Vert"), "Une source officielle prioritaire est incluse dans la recherche");
 assert.ok(prompts[0].includes("Fontaines D.C."), "Les premiers noms trouvés sur le site officiel guident la découverte");
+assert.ok(prompts[0].includes("Graspop Metal Meeting"), "Le sommaire du Graspop est consulté");
+assert.ok(prompts[0].includes("recent_headlines"), "Le prompt expose les titres officiels récents");
+assert.match(prompts[0],/FENÊTRE DE NOUVEAUTÉ/,
+  "La plage réelle de publication est fournie, pas seulement la date du concert");
 assert.ok(prompts[1].includes("nouvelles annonces post-punk"), "Le moteur lit la mémoire lors de la rédaction");
 assert.ok(!prompts[0].includes("Ce rejet est ponctuel"), "Un refus ponctuel n'est pas transmis");
 assert.ok(!prompts[1].includes("Ce rejet est ponctuel"), "Le refus ponctuel est aussi absent de la rédaction");
