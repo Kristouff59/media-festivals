@@ -40,6 +40,8 @@ assert.match(feedbackMigration, /status = 'rejected'/i);
 assert.match(migration, /create unique index\s+editorial_drafts_topic_unique\s+on public\.editorial_drafts\(topic_key\)\s*;/i);
 let handler, openaiCalls = 0, insertedDraft = null, runUpdates = 0;
 let emptyDiscovery = false;
+let multipleDiscovery = false, badSecondArticle = false, pendingCount = 0;
+const insertedDrafts = [];
 let pressConfirmation = false;
 let logWriteError = false;
 const savedLogs = [];
@@ -79,6 +81,19 @@ const story = {
     editionYear: 2027, dates: "18 juin 2027",
     lineup: [{ day: "Vendredi 18 juin 2027", artists: ["Rock Un", "Rock Deux"] }] },
 };
+const secondStory = {
+  ...story,
+  topic_key: "deuxieme-festival-affiche-2027",
+  title: "Le Deuxième Festival 2027 annonce une nouvelle affiche de rock",
+  excerpt: "Le Deuxième Festival annonce une nouvelle affiche de rock et prépare son édition 2027 avec plusieurs noms attendus.",
+  festival: null,
+};
+const secondSourceHTML = '<html><head><meta property="article:published_time" content="' +
+  new Date(Date.now()-86400000).toISOString() +
+  '"></head><body><h1>Deuxième Festival 2027</h1><p>' +
+  "Le festival Deuxième Festival confirme une nouvelle programmation rock pour 2027. " +
+  "La scène du Deuxième Festival fait découvrir des artistes de rock cette semaine. ".repeat(6) +
+  '</p></body></html>';
 function answer(body, status = 200) {
   return new Response(body === null ? null : JSON.stringify(body), {
     status, headers: { "Content-Type": "application/json" },
@@ -86,7 +101,8 @@ function answer(body, status = 200) {
 }
 async function fakeFetch(url, options = {}) {
   const address = String(url);
-  if (address.includes("/rest/v1/editorial_drafts?select=id&status=eq.pending")) return answer([]);
+  if (address.includes("/rest/v1/editorial_drafts?select=id&status=eq.pending"))
+    return answer(Array.from({length:pendingCount},(_,i)=>({id:"pending-"+i})));
   if (address.includes("/rest/v1/editorial_radar_runs?on_conflict=slot")) return answer([{ slot: "2026-10-26-matin" }], 201);
   if (address.includes("/rest/v1/editorial_drafts?select=topic_key")) return answer([]);
   if (address.includes("/rest/v1/editorial_feedback?select=")) return answer(editorialReturns);
@@ -114,6 +130,7 @@ async function fakeFetch(url, options = {}) {
   }
   if (address.includes("/rest/v1/editorial_drafts?on_conflict=topic_key")) {
     insertedDraft = JSON.parse(options.body)[0];
+    insertedDrafts.push(insertedDraft);
     return answer([{ id: "test" }], 201);
   }
   if (address.includes("/rest/v1/editorial_radar_runs?slot=")) {
@@ -145,6 +162,9 @@ async function fakeFetch(url, options = {}) {
       '<p>Grand Festival annonce Rock Un en 2027. ' + 
       'Un nouvel artiste est officiellement confirmé par les organisateurs. '.repeat(7) + '</p></body></html>',
       { status:200, headers:{"content-type":"text/html"} });
+  if (address.includes("secondfestival.example")) return new Response(secondSourceHTML, {
+    status: 200, headers: { "content-type": "text/html" },
+  });
   if (address.includes("grandfestival.example")) return new Response(sourceHTML, {
     status: 200, headers: { "content-type": "text/html" },
   });
@@ -158,21 +178,35 @@ async function fakeFetch(url, options = {}) {
       output: [
       { type: "web_search_call" },
       { type: "message", content: [{ type: "output_text",
-        text: JSON.stringify({ candidates: emptyDiscovery ? [] : [{
-          topic: "Grand Festival 2027 annonce une première programmation",
-          topic_key: "grand-festival-programmation-2027",
-          why_now: "Annonce officielle cette semaine",
-          official_url: "https://grandfestival.example/programme",
-          quotes: ["Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027."],
-          festival_name: "Grand Festival",
-          press_url: pressConfirmation ? "https://www.liveandshootmag.com/grand-festival-2027/" : "",
-          announced_artists: pressConfirmation ? ["Rock Un"] : [],
-        }] }) }] },
+        text: JSON.stringify({ candidates: emptyDiscovery ? [] : [
+          {
+            topic: "Grand Festival 2027 annonce une première programmation",
+            topic_key: "grand-festival-programmation-2027",
+            why_now: "Annonce officielle cette semaine",
+            official_url: "https://grandfestival.example/programme",
+            quotes: ["Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027."],
+            festival_name: "Grand Festival",
+            press_url: pressConfirmation ? "https://www.liveandshootmag.com/grand-festival-2027/" : "",
+            announced_artists: pressConfirmation ? ["Rock Un"] : [],
+          },
+          ...(multipleDiscovery ? [{
+            topic: "Deuxième Festival 2027 annonce une autre affiche rock",
+            topic_key: "deuxieme-festival-affiche-2027",
+            why_now: "Deuxième annonce officielle de la semaine",
+            official_url: "https://secondfestival.example/news",
+            quotes: ["Le festival Deuxième Festival confirme une nouvelle programmation rock pour 2027."],
+            festival_name: "Deuxième Festival", press_url: "", announced_artists: [],
+          }] : []),
+        ] }) }] },
     ] });
     return answer({ status: "completed", id:"resp-test-redaction", model:"test-mini",
       usage:{input_tokens:350,output_tokens:200,output_tokens_details:{reasoning_tokens:20}},
       output: [{ type: "message",
-      content: [{ type: "output_text", text: JSON.stringify(story) }] }] });
+      content: [{ type: "output_text", text: JSON.stringify(multipleDiscovery
+        ? { articles: [
+          {...story,topic_key:"grand-festival-programmation-2027"},
+          {...secondStory,...(badSecondArticle ? { title:"Court" } : {})},
+        ] } : story) }] }] });
   }
   throw Error("Accès réseau non prévu dans le test : " + address);
 }
@@ -387,5 +421,64 @@ const noFalseFresh = await handler(new Request("https://project.supabase.co/func
 assert.equal((await noFalseFresh.json()).rejections[0].reason,"annonce_trop_ancienne");
 assert.equal(openaiCalls,1);
 assert.equal(insertedDraft,null);
+
+// En haute saison, deux annonces indépendantes vérifiées deviennent DEUX
+// brouillons avec un UNIQUE appel de découverte et de rédaction en lot.
+sourceHTML = '<html><head><meta property="article:published_time" content="' +
+  new Date(Date.now()-86400000).toISOString() +
+  '"></head><body><h1>Grand Festival 2027</h1>' +
+  "Cette programmation nouvelle confirme le retour du groupe de rock au Grand Festival en 2027. " +
+  "Le festival Grand Festival annonce les artistes sur sa page officielle dès ce matin. " +
+  "Vendredi 18 juin 2027 Rock Un et Rock Deux. ".repeat(5) + "</body></html>";
+pressConfirmation=false;
+multipleDiscovery=true;
+openaiCalls=0;
+insertedDrafts.length=0;
+const multi = await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  {method:"POST",headers:{apikey:"sb_secret_test_only_nonproduction"},body:"{}"}));
+const multiReport=await multi.json();
+assert.equal(multi.status,200,JSON.stringify(multiReport));
+assert.equal(multiReport.result,"articles_a_valider",JSON.stringify(multiReport));
+assert.equal(multiReport.count,2);
+assert.equal(multiReport.eligible_count,2);
+assert.equal(multiReport.articles.length,2);
+assert.equal(insertedDrafts.length,2,"Les deux propositions sont sauvegardées indépendamment");
+assert.equal(insertedDrafts[0].status,"pending");
+assert.equal(insertedDrafts[1].status,"pending");
+assert.equal(openaiCalls,2,"Un appel pour la découverte, un appel pour TOUTES les rédactions");
+assert.notEqual(insertedDrafts[0].topic_key,insertedDrafts[1].topic_key);
+assert.equal(insertedDrafts[1].payload.article.sources[0].url,
+  "https://secondfestival.example/news",
+  "Chaque article conserve la preuve correspondant à SON annonce");
+
+// Si un article du lot est mauvais, l'autre doit toujours être proposé.
+badSecondArticle=true;
+insertedDrafts.length=0;
+openaiCalls=0;
+const partial=await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  {method:"POST",headers:{apikey:"sb_secret_test_only_nonproduction"},body:"{}"}));
+const partialReport=await partial.json();
+assert.equal(partialReport.result,"article_a_valider",JSON.stringify(partialReport));
+assert.equal(partialReport.count,1);
+assert.equal(insertedDrafts.length,1);
+assert.equal(openaiCalls,2);
+assert.ok(partialReport.rejections.some(x=>x.reason==="article_ecarte_controle_qualite"));
+badSecondArticle=false;
+// En cas de grosse file d'attente, on conserve la capacité restante.
+pendingCount=39;
+insertedDrafts.length=0;
+const backlog=await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  {method:"POST",headers:{apikey:"sb_secret_test_only_nonproduction"},body:"{}"}));
+const backlogReport=await backlog.json();
+assert.equal(backlogReport.count,1);
+assert.equal(insertedDrafts.length,1,"Ne pas dépasser la file de validation");
+assert.ok(backlogReport.rejections.some(x=>x.reason==="capacite_du_passage_atteinte"));
+pendingCount=40;
+const beforeFull=openaiCalls;
+const full=await handler(new Request("https://project.supabase.co/functions/v1/backstage-radar",
+  {method:"POST",headers:{apikey:"sb_secret_test_only_nonproduction"},body:"{}"}));
+assert.equal((await full.json()).result,"file_editoriale_saturee");
+assert.equal(openaiCalls,beforeFull,"Une file saturée ne consomme aucun token");
+pendingCount=0;
 
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
