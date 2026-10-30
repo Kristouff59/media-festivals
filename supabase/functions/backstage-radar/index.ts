@@ -310,7 +310,9 @@ function articleValid(a, source) {
 function articleMatchesTopic(article, news, proof) {
   const paragraphs = [...(article.body || []),
     ...(article.sections || []).flatMap(x=>x.paragraphs || [])].join(" ");
-  const text = norm([article.title,article.excerpt,paragraphs].join(" "));
+  const lineup = Array.isArray(article.festival?.lineup)
+    ? article.festival.lineup.flatMap(day=>day.artists || []).join(" ") : "";
+  const text = norm([article.title,article.excerpt,paragraphs,lineup].join(" "));
   const festivalName = norm(news.festival_name || "");
   if (festivalName.length >= 5 && norm(proof.source).includes(festivalName) &&
       !text.includes(festivalName)) return false;
