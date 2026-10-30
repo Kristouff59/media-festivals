@@ -51,10 +51,12 @@ rédacteur ont déjà été créés.
 
 **Important :** le coût API OpenAI est distinct de ChatGPT Plus. Activer
 des alertes de consommation sur le compte API. Le radar prévoit au plus
-**deux requêtes OpenAI par passage** (une recherche Web qui peut utiliser
-jusqu'à trois appels d'outil, puis une rédaction), deux fois par jour.
-Les appels d'outil Web ont également un coût. Il limite également
-la file à cinq articles en attente.
+**deux requêtes OpenAI par passage** (une découverte Web pouvant utiliser
+plusieurs recherches d'outil, puis une rédaction EN LOT), deux fois par jour.
+Les appels d'outil Web ont également un coût. Plusieurs articles dans une
+même réponse demandent **davantage de tokens de sortie** qu'un seul article.
+Le moteur protège la file de validation avec un maximum de 40 articles
+en attente, plutôt que l'ancienne limite de cinq.
 
 Supabase injecte automatiquement les variables `SUPABASE_URL` et
 `SUPABASE_SECRET_KEYS` dans les Edge Functions hébergées. Il ne faut pas
@@ -429,6 +431,46 @@ nouvelle migration SQL. Ne pas réinitialiser les anciens créneaux
 uniquement pour tester les logs ; la prochaine exécution prendra en
 compte ce code si elle est déployée au préalable.
 
+## Mise à jour — plusieurs articles par passage (30 octobre 2026)
+
+Le radar **ne s'arrête plus au premier sujet validé**. Les annonces
+de la journée sont vérifiées individuellement et tous les sujets
+pertinents qui passent les contrôles sont candidats à la rédaction.
+Le modèle génère les articles **dans une seule réponse en lot**, puis
+chaque texte est vérifié et inséré séparément dans la file d'approbation.
+
+- **Par défaut : 6 articles maximum par veille**, donc jusqu'à
+  12 propositions par jour avec les passages de 07 h et 18 h.
+  Le plafond est une protection de coût et de durée, PAS un quota à remplir.
+  Zéro article reste un résultat parfaitement normal.
+- Pour les périodes très chargées, le secret d'environnement facultatif
+  `BACKSTAGE_MAX_ARTICLES` peut être réglé sur **8** dans les
+  secrets de l'Edge Function. Il ajuste la limite de sécurité par
+  passage sans migration SQL ni changement de programme Cron.
+- **Jusqu'à 12 pistes** proposées par OpenAI sont vérifiées, contre
+  seulement 4 précédemment. Si plus de sources sont valides que la
+  capacité du passage, les excédents apparaissent dans les diagnostics
+  comme `capacite_du_passage_atteinte`. Le moteur ne garantit PAS
+  leur reprise automatique au passage suivant.
+- Une rédaction invalide ou un doublon **n'empêche plus** les autres
+  articles de rejoindre la file de validation.
+- La file de brouillons en attente a une capacité de 40 articles ;
+  chacun reste publié uniquement après ta décision dans `/admin/`.
+- Si la notification par e-mail est configurée, un passage avec
+  plusieurs articles génère **un récapitulatif unique**, plutôt
+  qu'un e-mail pour chaque article.
+- La découverte et la rédaction utilisent toujours au maximum
+  **deux requêtes API OpenAI**. Le coût en tokens de rédaction peut
+  augmenter en fonction du nombre réel d'articles générés, contrairement
+  à la simple conservation des logs.
+
+**Déploiement :** redéployer uniquement
+[`supabase/functions/backstage-radar/index.ts`](supabase/functions/backstage-radar/index.ts)
+dans **Supabase → Edge Functions → backstage-radar → Deploy updates**.
+Les tables existantes et le calendrier de 07 h / 18 h ne changent pas ;
+**aucun nouveau SQL n'est nécessaire**. Les tests GitHub ne prouvent
+pas que la nouvelle version est déjà installée dans Supabase.
+
 ## Étape 3 — Lier Supabase Cron en toute sécurité
 
 1. Aller dans **Settings → API Keys** et afficher la **Secret key**
@@ -497,18 +539,19 @@ dans `/admin/` et visibles au prochain accès.
 
 ## Comment fonctionne la veille OpenAI
 
-- Découverte de 0 à 6 pistes récentes avec une vraie recherche Web OpenAI.
+- Découverte de 0 à 12 pistes récentes avec une vraie recherche Web OpenAI.
   La recherche ne doit plus vérifier elle-même les métadonnées de publication
   ou produire deux citations avant de retourner une piste : elle identifie
   les annonces potentielles, puis le moteur vérifie les sources séparément.
-  Jusqu'à quatre pistes sont examinées par passage, sans créer de brouillon
-  en cas de vérification insuffisante.
+  Jusqu'à douze pistes sont contrôlées en parallèle par passage.
+  Chaque piste écartée reste identifiable par son motif de rejet.
 - Sources primaires seulement, HTTPS, blocage des agrégateurs courants.
 - Vérification directe des extraits réellement présents sur la page officielle.
 - Rédaction originale, bornes de longueur et cohérence de quelques données
   factuelles. Si un contrôle échoue, rien n'est proposé.
 - Déduplication des sujets déjà enregistrés, y compris après un refus.
-- Si cinq brouillons attendent, la recherche s'arrête **avant tout appel OpenAI**.
+- Si 40 brouillons attendent déjà une décision, la recherche s'arrête
+  **avant tout appel OpenAI**. Une file de 39 laisse encore une place.
 - Création d'un brouillon privé Supabase (statut `pending`), éventuellement
   une proposition de mise à jour du festival.
 - Votre décision dans BACKSTAGE /admin passe à `published` ou `rejected`.
