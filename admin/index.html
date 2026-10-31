@@ -92,7 +92,7 @@ textarea{min-height:125px;resize:vertical;line-height:1.5}
 </section>
 <section id="workspace" hidden>
 <div class="row"><span id="counter" class="pill">0 article en attente</span><span id="radar-state" class="pill">Veille Supabase non encore activée</span><button class="secondary" id="refresh">Actualiser</button></div>
-<details id="radar-diagnostics" hidden><summary>Pourquoi aucun article n'a-t-il été proposé ?</summary><p id="radar-diagnostic-text"></p></details>
+<details id="radar-diagnostics" hidden><summary>Bilan de la dernière veille : articles retenus et pistes écartées</summary><p id="radar-diagnostic-text"></p></details>
 <details id="ai-logs-panel" class="panel">
 <summary>Journal privé des appels OpenAI <span id="ai-logs-count" class="pill">Chargement…</span></summary>
 <p class="muted">Uniquement les appels déjà effectués. Aucun token OpenAI n'est consommé pour consulter ce journal. Historique conservé 30 jours.</p>
@@ -309,11 +309,9 @@ if(!radar.error && radar.data?.length){
   $('radar-state').textContent='Dernière veille : '+date+' ('+
     (run.status==='completed'?'terminée':run.status==='running'?'en cours':'échec')+')';
   $('radar-state').title=run.detail||'';
-  const explanation=String(run.detail||'');
-  const hasRejections=explanation.startsWith('Aucune source vérifiée :');
-  $('radar-diagnostics').hidden=!hasRejections;
-  $('radar-diagnostic-text').textContent=hasRejections
-    ? explanation.slice('Aucune source vérifiée :'.length).trim():'';
+  const explanation=String(run.detail||'').trim();
+  $('radar-diagnostics').hidden=!explanation;
+  $('radar-diagnostic-text').textContent=explanation;
 }else{
   $('radar-state').textContent='Veille Supabase non encore activée';
   $('radar-diagnostics').hidden=true;
