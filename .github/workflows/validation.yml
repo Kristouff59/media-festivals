@@ -21,6 +21,8 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'supabase/functions/**'
+      - 'tests/**'
       - 'index.html'
       - 'redaction/validations/**'
       - '.github/workflows/validation.yml'

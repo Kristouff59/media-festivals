@@ -481,4 +481,71 @@ assert.equal((await full.json()).result,"file_editoriale_saturee");
 assert.equal(openaiCalls,beforeFull,"Une file saturée ne consomme aucun token");
 pendingCount=0;
 
-console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication");
+// Régressions de corroboration, horloge et réseau entièrement déterministes.
+const fixedNow = Date.parse("2026-10-31T07:00:00Z");
+class FixedDate extends Date {
+  static now() { return fixedNow; }
+}
+let pressHTML, pressStatus = 200, pressType = "text/html", pressThrows = false;
+const verificationLogs = [];
+const checkCtx = {
+  ...ctx, Date: FixedDate,
+  console: { ...console, info: (...args) => verificationLogs.push(args) },
+  fetch: async url => {
+    if (String(url).includes("official.example")) return new Response(officialHTML,
+      { headers: { "content-type": "text/html" } });
+    if (pressThrows) throw new TypeError("redirect or network error");
+    return new Response(pressHTML, {status: pressStatus, headers: {"content-type": pressType}});
+  },
+};
+vm.runInNewContext(source, checkCtx);
+const quote = "Le Grand Festival confirme les artistes de sa nouvelle programmation.";
+const officialHTML = `<h1>Grand Festival</h1><p>${quote} U2 IAM Muse Pulp. ${"Informations officielles du festival. ".repeat(12)}</p>`;
+const pressPage = (artists, meta = '2026-10-30', header = '') =>
+  `${meta ? `<meta property="article:published_time" content="${meta}">` : ''}` +
+  `<h1>Grand Festival</h1>${header}<p>${artists}. ${"Informations de presse sur les concerts. ".repeat(12)}</p>`;
+const candidate = { official_url: "https://official.example/lineup", quotes: [quote],
+  festival_name: "Grand Festival", press_url: "https://nme.com/news/test", announced_artists: ["U2"] };
+async function checkPress(changes = {}, expected = null) {
+  const diagnostic = {};
+  const proof = await checkCtx.verify({...candidate, ...changes}, diagnostic);
+  if (expected) {
+    assert.equal(proof, null);
+    assert.equal(diagnostic.reason, "presse_non_corroboree");
+    assert.equal(diagnostic.press_reason, expected);
+  } else assert.ok(proof, JSON.stringify(diagnostic));
+}
+for (const artist of ["U2", "IAM", "Muse", "Pulp"]) {
+  pressHTML = pressPage(artist);
+  await checkPress({announced_artists: [artist]});
+}
+pressHTML = pressPage("Museum");
+await checkPress({announced_artists: ["Muse"]}, "artiste_non_recoupe");
+pressHTML = pressPage("U2", "2026-10-01", "Concert le 30 octobre 2026");
+await checkPress({}, "presse_annonce_trop_ancienne");
+pressHTML = pressPage("U2", "2026-11-10", "30 octobre 2026");
+await checkPress({}, "presse_date_publication_future");
+pressHTML = pressPage("U2", "", "30 octobre 2026");
+await checkPress();
+pressHTML = pressPage("U2", "");
+await checkPress({}, "presse_date_publication_absente");
+pressHTML = pressPage("U2");
+await checkPress({press_url: "https://unknown.example/news"}, "presse_url_non_autorisee");
+await checkPress({announced_artists: []}, "artistes_non_renseignes");
+await checkPress({festival_name: ""}, "festival_non_renseigne");
+await checkPress({festival_name: "Autre Festival"}, "festival_absent_source_officielle");
+pressHTML = pressPage("U2").replace("Grand Festival", "Autre Festival");
+await checkPress({}, "festival_absent_presse");
+pressHTML = "<h1>Grand Festival U2</h1>";
+await checkPress({}, "presse_trop_courte");
+pressHTML = pressPage("U2");
+pressStatus = 403;
+await checkPress({}, "presse_http_403");
+pressStatus = 200; pressType = "application/json";
+await checkPress({}, "presse_non_html");
+pressType = "text/html"; pressHTML = "a".repeat(700001);
+await checkPress({}, "presse_trop_volumineuse");
+pressThrows = true;
+await checkPress({}, "presse_inaccessible");
+
+console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication, diagnostics presse et noms courts");
