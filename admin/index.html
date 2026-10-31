@@ -122,7 +122,7 @@ const reasonLabels={
 };
 function setVisible(id,on){$(id).hidden=!on}
 function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé',deleted:'Supprimé'})[v]||v}
-function imagePreview(img){if(!img||!/^https:\/\/[^\\s\"'<>]+$/.test(img.url||''))return '';return '<figure style="margin:14px 0"><img loading="lazy" src="'+escapeHTML(img.url)+'" alt="'+escapeHTML(img.alt||'')+'" style="max-width:100%;max-height:360px"><figcaption>'+escapeHTML(img.caption||'')+' · Crédit : '+escapeHTML(img.credit||'')+'</figcaption></figure>'}
+function imagePreview(img){if(!img||!/^https:\/\/[^\s\"'<>]+$/.test(img.url||''))return '';return '<figure style="margin:14px 0"><img loading="lazy" src="'+escapeHTML(img.url)+'" alt="'+escapeHTML(img.alt||'')+'" style="max-width:100%;max-height:360px"><figcaption>'+escapeHTML(img.caption||'')+' · Crédit : '+escapeHTML(img.credit||'')+'</figcaption></figure>'}
 function documentText(a){
 let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>'+imagePreview(a.heroImage);
 for(const p of a.body||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';
@@ -367,13 +367,13 @@ await Promise.all([loadAiLogs(),loadSources(),loadStaticArticles()]);
 async function saveImages(row){
  if(busy||row.status!=='pending')return;
  const url=$('hero-url').value.trim(),alt=$('hero-alt').value.trim(),caption=$('hero-caption').value.trim(),credit=$('hero-credit').value.trim();
- if(url&&(!/^https:\/\/[^\\s"'<>]+$/.test(url)||!alt||!credit||!$('hero-rights').checked)){setMessage('Couverture : URL HTTPS, texte alternatif, crédit et autorisation nécessaires.');return}
+ if(url&&(!/^https:\/\/[^\s"'<>]+$/.test(url)||!alt||!credit||!$('hero-rights').checked)){setMessage('Couverture : URL HTTPS, texte alternatif, crédit et autorisation nécessaires.');return}
  const lines=$('inline-image-lines').value.split('\n').map(s=>s.trim()).filter(Boolean);
  if(lines.length>4){setMessage('Quatre illustrations maximum.');return}
  const inlineImages=[];
  for(const line of lines){const parts=line.split('|').map(x=>x.trim());const [imageUrl,imageAlt,imageCaption,imageCredit,index]=parts;
   const position=Number(index);
-  if(parts.length!==5||!/^https:\/\/[^\\s"'<>]+$/.test(imageUrl)||!imageAlt||!imageCredit||!Number.isInteger(position)||position<0||position>(row.payload?.article?.sections||[]).length){setMessage('Ligne incorrecte : URL | alt | légende | crédit | numéro de section.');return}
+  if(parts.length!==5||!/^https:\/\/[^\s"'<>]+$/.test(imageUrl)||!imageAlt||!imageCredit||!Number.isInteger(position)||position<0||position>(row.payload?.article?.sections||[]).length){setMessage('Ligne incorrecte : URL | alt | légende | crédit | numéro de section.');return}
   inlineImages.push({url:imageUrl,alt:imageAlt,caption:imageCaption,credit:imageCredit,afterSection:position});
  }
  if(inlineImages.length&&!$('inline-rights').checked){setMessage('Confirme les droits des illustrations.');return}
