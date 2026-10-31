@@ -575,4 +575,14 @@ const validShape = {
 assert.equal(checkCtx.articleValid(validShape,
   "Graspop Metal Meeting 2027 accueillera Evanescence."),true);
 
+// Un dossier solide de plus de 1000 mots ne doit plus être rejeté pour sa longueur.
+const extended = {
+  ...validShape,
+  sections:[{title:"Analyse documentée",paragraphs:Array(14).fill(
+    "Le festival confirme cette nouvelle programmation pour son édition 2027 et détaille les artistes annoncés. ".repeat(10))}]
+};
+assert.equal(checkCtx.articleValid(extended,
+  "Graspop Metal Meeting 2027 accueillera Evanescence."),true);
+assert.match(source,/1000 à 2200 mots/);
+assert.match(source,/2500/);
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication, diagnostics presse et noms courts");
