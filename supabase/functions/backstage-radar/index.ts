@@ -744,6 +744,63 @@ async function run(key) {
         return { news, topic, reason: "source_inaccessible" };
       }
     }));
+    // Recherche complémentaire groupée si la page officielle ne porte pas de
+    // date de publication exploitable. Le moteur Web propose uniquement des
+    // URLs : le serveur télécharge et contrôle lui-même chaque source datée.
+    const undated = assessments.filter(x =>
+      x.reason === "date_publication_absente" ||
+      (x.reason === "presse_non_corroboree" &&
+       ["presse_url_non_autorisee","presse_date_publication_absente",
+        "presse_annonce_trop_ancienne","presse_inaccessible"].includes(x.press_reason)));
+    if (undated.length) {
+      try {
+        const search = await openai(
+          "Recherche une AUTRE SOURCE DE PRESSE fiable et datée (publication des sept derniers jours) " +
+          "pour CHACUNE des annonces suivantes, en reliant exactement le même artiste " +
+          "et le même festival. La date recherchée est celle de l'ANNONCE, pas la date " +
+          "du concert. Ne fournis jamais une URL supposée ou une page générale ; " +
+          "si aucune source vérifiable n'existe, laisse press_url vide. " +
+          "Cherche de préférence parmi les médias suivants : " +
+          trustedPressHosts.join(", ") + ". " +
+          "Annonce(s) à vérifier : " +
+          JSON.stringify(undated.map(x => ({
+            topic_key: x.news.topic_key, topic: x.news.topic,
+            festival_name: x.news.festival_name,
+            announced_artists: x.news.announced_artists,
+            official_url: x.news.official_url
+          }))).slice(0, 8000) +
+          '. Réponds uniquement en JSON {"sources":[{"topic_key":"clé fournie","press_url":"https://..."}]}.',
+          true, key, slot
+        );
+        const suggestions = new Map((Array.isArray(search.sources) ? search.sources : [])
+          .filter(x => typeof x?.topic_key === "string" && typeof x?.press_url === "string")
+          .map(x => [x.topic_key, x.press_url]));
+        for (const item of undated) {
+          const nextUrl = suggestions.get(item.news.topic_key);
+          if (!nextUrl || !pressURL(nextUrl)) {
+            item.press_reason = "recherche_secondaire_sans_source_recevable";
+            continue;
+          }
+          // Vérification indépendante : la simple réponse du moteur ne suffit pas.
+          const second = { ...item.news, press_url: nextUrl };
+          const diagnostic = {};
+          const proof = await verify(second, diagnostic).catch(() => null);
+          if (proof) {
+            item.proof = proof; item.reason = null;
+            item.press_reason = undefined;
+            item.news = second;
+          } else {
+            item.press_reason = diagnostic.press_reason ||
+              diagnostic.reason || "source_secondaire_non_verifiee";
+          }
+        }
+      } catch (error) {
+        console.error("Recherche complémentaire de date indisponible :",
+          String(error).slice(0, 180));
+        for (const item of undated)
+          item.press_reason = "recherche_secondaire_indisponible";
+      }
+    }
     for (const item of assessments) {
       if (!item.news || !item.proof) {
         rejectionDetails.push({ topic: item.topic, reason: item.reason,
