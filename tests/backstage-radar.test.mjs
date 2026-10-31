@@ -568,9 +568,9 @@ const longExcerpt = "Un chapô éditorial suffisamment détaillé pour décrire 
 const validShape = {
   title:"Evanescence deuxième tête d'affiche du vendredi à Graspop 2027",
   excerpt:longExcerpt,category:"FESTIVALS",
-  body:Array(2).fill("Le festival Graspop annonce Evanescence pour son édition 2027. ".repeat(2)),
+  body:Array(2).fill("Le festival Graspop annonce Evanescence pour son édition 2027. ".repeat(6)),
   sections:[{title:"Un retour",paragraphs:Array(2).fill(
-    "La programmation du Graspop Metal Meeting 2027 confirme ce concert. ".repeat(2))}]
+    "La programmation du Graspop Metal Meeting 2027 confirme ce concert. ".repeat(6))}]
 };
 assert.equal(checkCtx.articleValid(validShape,
   "Graspop Metal Meeting 2027 accueillera Evanescence."),true);
