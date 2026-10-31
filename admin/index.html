@@ -103,6 +103,7 @@ textarea{min-height:125px;resize:vertical;line-height:1.5}
 <p class="muted">Liste évolutive : les nouvelles sources vérifiées sont ajoutées automatiquement. Le radar continue aussi de chercher sur tout le Web.</p>
 <div id="source-registry-list"></div>
 </details>
+<details class="panel"><summary>Articles historiques intégrés au site</summary><p class="muted">Retirer un ancien article du site, même s’il ne figure pas dans la liste des brouillons Supabase.</p><div id="static-articles"></div></details>
 <div id="layout"><div id="drafts"></div><article id="preview" class="panel article"><p class="empty">Sélectionnez un article pour le lire.</p></article></div>
 </section>
 </main>
@@ -120,7 +121,7 @@ const reasonLabels={
   fiabilite:'Informations ou sources',actualite:'Actualité insuffisante',autre:'Autre raison'
 };
 function setVisible(id,on){$(id).hidden=!on}
-function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé'})[v]||v}
+function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé',deleted:'Supprimé'})[v]||v}
 function documentText(a){
 let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>';
 for(const p of a.body||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';
@@ -139,6 +140,7 @@ if(fests.length){html+='<h3>Fiches festivals mises à jour</h3>';for(const chang
 html+='<h3>Sources</h3><ul class="source-list">';
 for(const source of a.sources||[]){if(/^https:\/\/[^\s"'<>]+$/.test(source.url))html+='<li><a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(source.url)+'">'+escapeHTML(source.label)+'</a></li>'}
 html+='</ul>';
+if(row.status!=='deleted')html+='<div class="actions"><button id="delete-article" class="danger">Supprimer cet article</button></div>';
 if(row.status==='pending'){
  html+='<div class="actions"><div class="row"><button id="approve">Publier cet article</button>'+
    '<button class="danger" id="reject">Refuser et expliquer pourquoi</button></div>'+
@@ -170,6 +172,7 @@ if(row.status==='pending'){
  }
 }
 $('preview').innerHTML=html;
+$('delete-article')?.addEventListener('click',()=>removeArticle(row));
 $('approve')?.addEventListener('click',()=>decide(row,'published'));
 $('reject')?.addEventListener('click',()=>{
   $('rejection-editor').hidden=false;
@@ -289,6 +292,40 @@ for(const entry of logs){
   container.append(box);
 }
 }
+async function loadStaticArticles(){
+ const container=$('static-articles');container.replaceChildren();
+ try{
+  const [page,hiddenResponse]=await Promise.all([
+   fetch('../index.html',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Page indisponible');return r.text()}),
+   client.rpc('list_hidden_article_slugs')
+  ]);
+  if(hiddenResponse.error)throw hiddenResponse.error;
+  const match=page.match(/window\\.BACKSTAGE_CONTENT\\s*=\\s*(\\{[^\\n]+\\});/);
+  if(!match)throw Error('Catalogue intégré introuvable');
+  const hidden=new Set((hiddenResponse.data||[]).map(x=>x.slug));
+  const items=(JSON.parse(match[1]).articles||[]).filter(x=>x.slug&&!hidden.has(x.slug));
+  for(const article of items){
+   const line=document.createElement('div');line.className='row';
+   line.style.cssText='justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--stroke)';
+   const title=document.createElement('span');title.textContent=article.title;
+   const button=document.createElement('button');button.className='danger';
+   button.textContent='Supprimer';button.type='button';
+   button.addEventListener('click',async()=>{
+    if(busy||!confirm('Retirer définitivement du site « '+article.title+' » ?'))return;
+    busy=true;button.disabled=true;
+    try{
+     const {error}=await client.rpc('remove_editorial_article',{p_slug:article.slug});
+     if(error)throw error;
+     setMessage('Article historique retiré du site.');
+     await load();
+    }catch(e){setMessage('Suppression impossible : '+e.message)}
+    finally{busy=false;button.disabled=false}
+   });
+   line.append(title,button);container.append(line);
+  }
+  if(!items.length)container.textContent='Aucun article historique actif.';
+ }catch(e){container.textContent='Impossible de charger les anciens articles : '+e.message}
+}
 async function load(){
 const {data,error}=await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload').order('created_at',{ascending:false}).limit(60);
 if(error){setMessage('Lecture impossible : '+error.message);return}
@@ -318,7 +355,19 @@ if(!radar.error && radar.data?.length){
 }
 if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
 showList();
-await Promise.all([loadAiLogs(),loadSources()]);
+await Promise.all([loadAiLogs(),loadSources(),loadStaticArticles()]);
+}
+async function removeArticle(row){
+ if(busy || row.status==='deleted')return;
+ if(!confirm('Supprimer « '+row.title+' » ? Cet article sera retiré du site et de la validation. Cette action ne peut pas être annulée depuis l’interface.'))return;
+ busy=true;setMessage('Suppression de l’article…');
+ try{
+  const {error}=await client.rpc('remove_editorial_article',{p_draft_id:row.id});
+  if(error)throw error;
+  setMessage('Article supprimé. Il ne sera plus proposé à la validation ni affiché en ligne.');
+  await load();
+ }catch(error){setMessage('Suppression impossible : '+error.message);showPreview()}
+ finally{busy=false}
 }
 async function decide(row,status){
 if(busy||row.status!=='pending')return;
