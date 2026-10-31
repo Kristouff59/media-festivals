@@ -585,4 +585,10 @@ assert.equal(checkCtx.articleValid(extended,
   "Graspop Metal Meeting 2027 accueillera Evanescence."),true);
 assert.match(source,/1000 à 2200 mots/);
 assert.match(source,/2500/);
+// Une date officielle absente doit déclencher une vérification complémentaire
+// sans jamais accepter la date du modèle sans preuve sur le site de presse.
+assert.match(source, /const undated = assessments\.filter/);
+assert.match(source, /recherche_secondaire_sans_source_recevable/);
+assert.match(source, /const proof = await verify\(second, diagnostic\)/);
+assert.match(source, /La date recherchée est celle de l'ANNONCE/);
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication, diagnostics presse et noms courts");
