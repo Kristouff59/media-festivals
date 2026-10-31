@@ -227,31 +227,43 @@ function datedNewsHeader(html) {
   if (age < -86400000 || age > 7*86400000) return null;
   return new Date(date).toISOString().slice(0, 10);
 }
-async function recentPressCorroboration(news, officialContent) {
+function containsName(text, name) {
+  return (" " + text + " ").includes(" " + norm(name) + " ");
+}
+async function recentPressCorroboration(news, officialContent, diagnostic = {}) {
+  const reject = reason => { diagnostic.press_reason = reason; return null; };
   const url = pressURL(news.press_url);
   const artistNames = Array.isArray(news.announced_artists)
-    ? news.announced_artists.filter(x => typeof x === "string" && norm(x).length >= 5)
+    ? news.announced_artists.filter(x => typeof x === "string" && norm(x).length >= 2)
       .slice(0, 10) : [];
   const festival = norm(news.festival_name);
-  if (!url || festival.length < 5 || !artistNames.length ||
-      !officialContent.includes(festival)) return null;
+  if (!url) return reject("presse_url_non_autorisee");
+  if (festival.length < 2) return reject("festival_non_renseigne");
+  if (!artistNames.length) return reject("artistes_non_renseignes");
+  if (!containsName(officialContent, festival)) return reject("festival_absent_source_officielle");
   const resp = await fetch(url, {
     redirect: "error", signal: AbortSignal.timeout(9000),
     headers: { Accept: "text/html", "User-Agent": "BACKSTAGE-editorial-check/1.0" },
   });
-  if (!resp.ok || !/html/i.test(resp.headers.get("content-type") || "") ||
-      Number(resp.headers.get("content-length") || 0) > 700000) return null;
+  if (!resp.ok) return reject("presse_http_" + resp.status);
+  if (!/html/i.test(resp.headers.get("content-type") || "")) return reject("presse_non_html");
+  if (Number(resp.headers.get("content-length") || 0) > 700000) return reject("presse_trop_volumineuse");
   const html = await resp.text();
-  if (html.length > 700000) return null;
+  if (html.length > 700000) return reject("presse_trop_volumineuse");
   const pressText = norm(plain(html));
-  if (pressText.length < 250 || !pressText.includes(festival)) return null;
+  if (pressText.length < 250) return reject("presse_trop_courte");
+  if (!containsName(pressText, festival)) return reject("festival_absent_presse");
   const supportedArtists = artistNames.filter(x => {
     const name = norm(x);
-    return officialContent.includes(name) && pressText.includes(name);
+    return containsName(officialContent, name) && containsName(pressText, name);
   });
-  if (!supportedArtists.length) return null;
-  const date = officialPublishedDate(html).value || datedNewsHeader(html);
-  if (!date) return null;
+  if (!supportedArtists.length) return reject("artiste_non_recoupe");
+  const publication = officialPublishedDate(html);
+  // Une date ancienne/future explicite ne peut être remplacée par une date
+  // de concert trouvée près du titre.
+  const date = publication.value || (publication.reason === "date_publication_absente"
+    ? datedNewsHeader(html) : null);
+  if (!date) return reject("presse_" + publication.reason);
   return { url, published: date, artist_names: supportedArtists };
 }
 async function verify(news, diagnostic = {}) {
@@ -281,8 +293,8 @@ async function verify(news, diagnostic = {}) {
     return reject("sujet_absent_de_la_source");
   let corroboration = null;
   if (!publication.value && publication.reason === "date_publication_absente") {
-    try { corroboration = await recentPressCorroboration(news, normalized); }
-    catch (_) { /* une source secondaire en échec ne suffit jamais */ }
+    try { corroboration = await recentPressCorroboration(news, normalized, diagnostic); }
+    catch (_) { diagnostic.press_reason = "presse_inaccessible"; }
   }
   if (!publication.value && !corroboration)
     return reject(publication.reason === "date_publication_absente" && news.press_url
@@ -703,7 +715,7 @@ async function run(key) {
       try {
         const diagnostic = {};
         const proof = await verify(news, diagnostic);
-        return { news, topic, proof, reason: proof ? null :
+        return { news, topic, proof, press_reason: diagnostic.press_reason, reason: proof ? null :
           diagnostic.reason || "source_non_verifiee" };
       } catch (_) {
         return { news, topic, reason: "source_inaccessible" };
@@ -711,7 +723,8 @@ async function run(key) {
     }));
     for (const item of assessments) {
       if (!item.news || !item.proof) {
-        rejectionDetails.push({ topic: item.topic, reason: item.reason });
+        rejectionDetails.push({ topic: item.topic, reason: item.reason,
+          ...(item.press_reason ? { press_reason: item.press_reason } : {}) });
         continue;
       }
       const keyValue = item.news.topic_key;
@@ -726,6 +739,11 @@ async function run(key) {
       }
       approvedCandidates.push(item);
     }
+    // Détail complet dans les logs Edge, même si le résumé SQL est tronqué
+    // ou si d'autres pistes du lot aboutissent à un article.
+    if (rejectionDetails.length) console.info("BACKSTAGE verification", JSON.stringify({
+      slot, rejections: rejectionDetails,
+    }));
     if (!approvedCandidates.length) {
       const result = "aucune_source_officielle_verifiee";
       const report = {
@@ -737,7 +755,8 @@ async function run(key) {
         rejections: rejectionDetails,
       };
       outcome = ("Aucune source vérifiée : " + rejectionDetails
-        .map(x => x.topic.slice(0, 65) + " (" + x.reason + ")").join(" ; "))
+        .map(x => x.topic.slice(0, 65) + " (" + x.reason +
+          (x.press_reason ? ":" + x.press_reason : "") + ")").join(" ; "))
         .slice(0, 440);
       if (!rejectionDetails.length)
         outcome = "Aucune source vérifiée : OpenAI n'a proposé aucun sujet.";
