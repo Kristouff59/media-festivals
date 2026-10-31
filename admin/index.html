@@ -295,15 +295,16 @@ for(const entry of logs){
 async function loadStaticArticles(){
  const container=$('static-articles');container.replaceChildren();
  try{
-  const [page,hiddenResponse]=await Promise.all([
-   fetch('../index.html',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Page indisponible');return r.text()}),
+  const [catalogueResponse,hiddenResponse]=await Promise.all([
+   fetch('../historical-articles.json',{cache:'no-store'}),
    client.rpc('list_hidden_article_slugs')
   ]);
+  if(!catalogueResponse.ok)throw Error('Catalogue indisponible (HTTP '+catalogueResponse.status+')');
   if(hiddenResponse.error)throw hiddenResponse.error;
-  const match=page.match(/window\.BACKSTAGE_CONTENT\s*=\s*(\{[^\n]+\});/);
-  if(!match)throw Error('Catalogue intégré introuvable');
+  const catalogue=await catalogueResponse.json();
+  if(!Array.isArray(catalogue))throw Error('Format du catalogue incorrect');
   const hidden=new Set((hiddenResponse.data||[]).map(x=>x.slug));
-  const items=(JSON.parse(match[1]).articles||[]).filter(x=>x.slug&&!hidden.has(x.slug));
+  const items=catalogue.filter(x=>typeof x.slug==='string' && typeof x.title==='string' && !hidden.has(x.slug));
   for(const article of items){
    const line=document.createElement('div');line.className='row';
    line.style.cssText='justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--stroke)';
