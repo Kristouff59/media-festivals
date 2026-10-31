@@ -120,7 +120,7 @@ const reasonLabels={
   fiabilite:'Informations ou sources',actualite:'Actualité insuffisante',autre:'Autre raison'
 };
 function setVisible(id,on){$(id).hidden=!on}
-function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé'})[v]||v}
+function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé',deleted:'Supprimé'})[v]||v}
 function documentText(a){
 let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>';
 for(const p of a.body||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';
@@ -139,6 +139,7 @@ if(fests.length){html+='<h3>Fiches festivals mises à jour</h3>';for(const chang
 html+='<h3>Sources</h3><ul class="source-list">';
 for(const source of a.sources||[]){if(/^https:\/\/[^\s"'<>]+$/.test(source.url))html+='<li><a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(source.url)+'">'+escapeHTML(source.label)+'</a></li>'}
 html+='</ul>';
+if(row.status!=='deleted')html+='<div class="actions"><button id="delete-article" class="danger">Supprimer cet article</button></div>';
 if(row.status==='pending'){
  html+='<div class="actions"><div class="row"><button id="approve">Publier cet article</button>'+
    '<button class="danger" id="reject">Refuser et expliquer pourquoi</button></div>'+
@@ -170,6 +171,7 @@ if(row.status==='pending'){
  }
 }
 $('preview').innerHTML=html;
+$('delete-article')?.addEventListener('click',()=>removeArticle(row));
 $('approve')?.addEventListener('click',()=>decide(row,'published'));
 $('reject')?.addEventListener('click',()=>{
   $('rejection-editor').hidden=false;
@@ -319,6 +321,18 @@ if(!radar.error && radar.data?.length){
 if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
 showList();
 await Promise.all([loadAiLogs(),loadSources()]);
+}
+async function removeArticle(row){
+ if(busy || row.status==='deleted')return;
+ if(!confirm('Supprimer « '+row.title+' » ? Cet article sera retiré du site et de la validation. Cette action ne peut pas être annulée depuis l’interface.'))return;
+ busy=true;setMessage('Suppression de l’article…');
+ try{
+  const {error}=await client.rpc('remove_editorial_article',{p_draft_id:row.id});
+  if(error)throw error;
+  setMessage('Article supprimé. Il ne sera plus proposé à la validation ni affiché en ligne.');
+  await load();
+ }catch(error){setMessage('Suppression impossible : '+error.message);showPreview()}
+ finally{busy=false}
 }
 async function decide(row,status){
 if(busy||row.status!=='pending')return;
