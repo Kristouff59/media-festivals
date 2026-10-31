@@ -876,8 +876,16 @@ async function run(key) {
     const notification = submitted.length === 1
       ? await notify({ title: submitted[0].title }, submitted[0].fingerprint)
       : await notifyDigest(submitted, slot);
-    outcome = submitted.length + " article(s) à valider : " +
-      submitted.map(x => x.title).join(" ; ").slice(0, 395);
+    const rejectionSummary = rejectionDetails.length
+      ? " | " + rejectionDetails.length + " piste(s) non retenue(s) : " +
+        rejectionDetails.map(x => x.topic.slice(0, 55) + " (" +
+          x.reason + (x.press_reason ? ": " + x.press_reason : "") +
+          ")").join(" ; ")
+      : "";
+    outcome = (
+      submitted.length + " article(s) à valider : " +
+      submitted.map(x => x.title).join(" ; ") + rejectionSummary
+    ).slice(0, 440);
     const result = submitted.length === 1 ? "article_a_valider" : "articles_a_valider";
     return {
       result, count: submitted.length,
