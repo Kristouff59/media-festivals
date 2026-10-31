@@ -122,10 +122,12 @@ const reasonLabels={
 };
 function setVisible(id,on){$(id).hidden=!on}
 function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé',deleted:'Supprimé'})[v]||v}
+function imagePreview(img){if(!img||!/^https:\/\/[^\s\"'<>]+$/.test(img.url||''))return '';return '<figure style="margin:14px 0"><img loading="lazy" src="'+escapeHTML(img.url)+'" alt="'+escapeHTML(img.alt||'')+'" style="max-width:100%;max-height:360px"><figcaption>'+escapeHTML(img.caption||'')+' · Crédit : '+escapeHTML(img.credit||'')+'</figcaption></figure>'}
 function documentText(a){
-let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>';
+let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>'+imagePreview(a.heroImage);
 for(const p of a.body||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';
-for(const group of a.sections||[]){out+='<h3>'+escapeHTML(group.title)+'</h3>';for(const p of group.paragraphs||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>'}
+for(const [i,group] of (a.sections||[]).entries()){out+='<h3>'+escapeHTML(group.title)+'</h3>';for(const p of group.paragraphs||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';for(const img of a.inlineImages||[])if(img.afterSection===i)out+=imagePreview(img)}
+for(const img of a.inlineImages||[])if(img.afterSection===(a.sections||[]).length)out+=imagePreview(img);
 return out;
 }
 function showPreview(){
@@ -140,6 +142,7 @@ if(fests.length){html+='<h3>Fiches festivals mises à jour</h3>';for(const chang
 html+='<h3>Sources</h3><ul class="source-list">';
 for(const source of a.sources||[]){if(/^https:\/\/[^\s"'<>]+$/.test(source.url))html+='<li><a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(source.url)+'">'+escapeHTML(source.label)+'</a></li>'}
 html+='</ul>';
+if(row.status==='pending')html+='<div class="actions"><button id="edit-images" class="secondary">Gérer les images</button><form id="images-editor" hidden><p class="small-help">Utilisez uniquement des images autorisées à la publication. Crédit et texte alternatif obligatoires. Les images ne sont pas publiées avant validation de l’article.</p><label>Image de couverture (URL HTTPS)</label><input id="hero-url" type="url" placeholder="https://…"><label>Texte alternatif</label><input id="hero-alt"><label>Légende</label><input id="hero-caption"><label>Crédit / titulaire des droits</label><input id="hero-credit"><label>Droit d’utilisation confirmé</label><input type="checkbox" id="hero-rights"><h3>Illustrations dans l’article</h3><p class="small-help">Une image par ligne, format : URL | texte alternatif | légende | crédit | numéro de section (0 pour après la première).</p><textarea id="inline-image-lines" rows="5"></textarea><label><input type="checkbox" id="inline-rights"> Je confirme disposer du droit de publier les images ajoutées</label><div class="row"><button id="save-images" type="submit">Enregistrer les images</button><button id="cancel-images" type="button" class="secondary">Annuler</button></div></form></div>';
 if(row.status!=='deleted')html+='<div class="actions"><button id="delete-article" class="danger">Supprimer cet article</button></div>';
 if(row.status==='pending'){
  html+='<div class="actions"><div class="row"><button id="approve">Publier cet article</button>'+
@@ -173,6 +176,9 @@ if(row.status==='pending'){
 }
 $('preview').innerHTML=html;
 $('delete-article')?.addEventListener('click',()=>removeArticle(row));
+$('edit-images')?.addEventListener('click',()=>{const a=row.payload?.article||{};const edit=$('images-editor');edit.hidden=false;$('hero-url').value=a.heroImage?.url||'';$('hero-alt').value=a.heroImage?.alt||'';$('hero-caption').value=a.heroImage?.caption||'';$('hero-credit').value=a.heroImage?.credit||'';$('inline-image-lines').value=(a.inlineImages||[]).map(x=>[x.url,x.alt,x.caption||'',x.credit,x.afterSection].join(' | ')).join('\n');});
+$('cancel-images')?.addEventListener('click',()=>{$('images-editor').hidden=true});
+$('images-editor')?.addEventListener('submit',event=>{event.preventDefault();void saveImages(row)});
 $('approve')?.addEventListener('click',()=>decide(row,'published'));
 $('reject')?.addEventListener('click',()=>{
   $('rejection-editor').hidden=false;
@@ -357,6 +363,26 @@ if(!radar.error && radar.data?.length){
 if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
 showList();
 await Promise.all([loadAiLogs(),loadSources(),loadStaticArticles()]);
+}
+async function saveImages(row){
+ if(busy||row.status!=='pending')return;
+ const url=$('hero-url').value.trim(),alt=$('hero-alt').value.trim(),caption=$('hero-caption').value.trim(),credit=$('hero-credit').value.trim();
+ if(url&&(!/^https:\/\/[^\s"'<>]+$/.test(url)||!alt||!credit||!$('hero-rights').checked)){setMessage('Couverture : URL HTTPS, texte alternatif, crédit et autorisation nécessaires.');return}
+ const lines=$('inline-image-lines').value.split('\n').map(s=>s.trim()).filter(Boolean);
+ if(lines.length>4){setMessage('Quatre illustrations maximum.');return}
+ const inlineImages=[];
+ for(const line of lines){const parts=line.split('|').map(x=>x.trim());const [imageUrl,imageAlt,imageCaption,imageCredit,index]=parts;
+  const position=Number(index);
+  if(parts.length!==5||!/^https:\/\/[^\s"'<>]+$/.test(imageUrl)||!imageAlt||!imageCredit||!Number.isInteger(position)||position<0||position>(row.payload?.article?.sections||[]).length){setMessage('Ligne incorrecte : URL | alt | légende | crédit | numéro de section.');return}
+  inlineImages.push({url:imageUrl,alt:imageAlt,caption:imageCaption,credit:imageCredit,afterSection:position});
+ }
+ if(inlineImages.length&&!$('inline-rights').checked){setMessage('Confirme les droits des illustrations.');return}
+ const article={...row.payload.article,heroImage:url?{url,alt,caption,credit}:null,inlineImages};
+ const payload={...row.payload,article};
+ busy=true;setMessage('Enregistrement des images…');
+ try{const {error}=await client.rpc('update_editorial_draft_images',{p_draft_id:row.id,p_hero:article.heroImage,p_inline:inlineImages});if(error)throw error;setMessage('Images enregistrées dans le brouillon.');await load()}
+ catch(err){setMessage('Enregistrement impossible : '+err.message)}
+ finally{busy=false}
 }
 async function removeArticle(row){
  if(busy || row.status==='deleted')return;
