@@ -64,7 +64,7 @@ async function saveOpenAILog(key, entry) {
 async function openai(prompt, web, key, slot) {
   const req = {
     model, input: prompt, store: false,
-    reasoning: { effort: "low" }, max_output_tokens: web ? 4000 : 14500,
+    reasoning: { effort: "low" }, max_output_tokens: web ? 4000 : 24000,
   };
   if (web) {
     req.tools = [{ type: "web_search", search_context_size: "low" }];
@@ -332,8 +332,8 @@ function articleValid(a, source) {
       !Array.isArray(a.body) || a.body.length < 2 ||
       !Array.isArray(a.sections) || !a.sections.length) return false;
   const paragraphs = [...a.body, ...a.sections.flatMap(x => x.paragraphs || [])];
-  if (!paragraphs.every(p => typeof p === "string" && p.length >= 60 && p.length < 1600)) return false;
-  if (count(paragraphs.join(" ")) < 180 || count(paragraphs.join(" ")) > 750) return false;
+  if (!paragraphs.every(p => typeof p === "string" && p.length >= 60 && p.length < 3500)) return false;
+  if (count(paragraphs.join(" ")) < 180 || count(paragraphs.join(" ")) > 2500) return false;
   if (!a.sections.every(x => typeof x.title === "string" && Array.isArray(x.paragraphs))) return false;
   for (const year of (a.title + paragraphs.join(" ")).match(/\b20\d\d\b/g) || []) {
     if (!source.includes(year)) return false;
@@ -792,7 +792,7 @@ async function run(key) {
     const selected = approvedCandidates.map(x => ({
       topic_key: x.news.topic_key, topic: x.news.topic,
       why_now: x.news.why_now, published: x.proof.published,
-      official_url: x.proof.url, official_text: x.proof.source.slice(0, 4000),
+      official_url: x.proof.url, official_text: x.proof.source.slice(0, 12000),
     }));
     const writingPrompt =
       "Tu es le journaliste de BACKSTAGE, média français de musique live. " +
@@ -801,7 +801,13 @@ async function run(key) {
       "Chaque article doit se baser EXCLUSIVEMENT sur le texte officiel de SON sujet, " +
       "sans importer d'artistes, dates, villes ou chiffres d'autres sujets. " +
       "Style journalistique vivant, précis, sans publicité, sans citations inventées. " +
-      "Entre 220 et 400 mots par article, chapô, paragraphes et intertitres. " +
+      "Choisis une longueur adaptée au sujet : 220 à 450 mots pour une annonce simple, " +
+       "500 à 1000 mots pour une actualité qui mérite du contexte, et 1000 à 2200 mots " +
+       "pour un dossier, une analyse ou une enquête suffisamment documentée. " +
+       "Aucune obligation de remplir ces fourchettes : approfondis uniquement si " +
+       "les sources transmises permettent d’étayer chaque information. " +
+       "N’invente jamais de citation, de contexte, de témoignage ou de faits pour allonger. " +
+       "Structure les formats longs en plusieurs sections claires. " +
       editorialGuidance +
       "Retourne UNIQUEMENT un objet JSON avec une propriété articles qui est un tableau " +
       "de zéro à " + selected.length + " articles. Ne force aucun article dont les " +
