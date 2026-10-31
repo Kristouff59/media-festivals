@@ -81,6 +81,12 @@ async function loadPublishedFromEditorialDatabase(){
   if(!res.ok)throw new Error('Synchronisation éditoriale indisponible');
   const rows=await res.json();
   if(!Array.isArray(rows))return;
+  const hiddenRes=await fetch(SUPABASE_URL.replace(/\/+$/,'')+'/rest/v1/rpc/list_hidden_article_slugs',{
+    method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},
+    body:'{}',cache:'no-store'
+  });
+  if(!hiddenRes.ok)throw new Error('Liste de suppressions indisponible');
+  const hidden=new Set((await hiddenRes.json()).map(row=>row.slug));
   const mergedArticles=new Map(db.articles.map(a=>[a.slug,a]));
   const mergedFestivals=new Map((db.festivals||[]).map(f=>[f.name.toLocaleLowerCase('fr'),f]));
   for(const row of rows.reverse()){
@@ -96,7 +102,7 @@ async function loadPublishedFromEditorialDatabase(){
       }
     }
   }
-  articles=[...mergedArticles.values()].sort((a,b)=>articleTime(b)-articleTime(a));
+  articles=[...mergedArticles.values()].filter(a=>!hidden.has(a.slug)).sort((a,b)=>articleTime(b)-articleTime(a));
   festivals=[...mergedFestivals.values()];
   render();
 }
