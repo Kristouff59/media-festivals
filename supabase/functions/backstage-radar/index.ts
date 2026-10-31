@@ -857,7 +857,23 @@ async function run(key) {
       "vérifiés. N'en invente aucun et ne fusionne pas plusieurs annonces. " +
       "Chaque article doit se baser EXCLUSIVEMENT sur le texte officiel de SON sujet, " +
       "sans importer d'artistes, dates, villes ou chiffres d'autres sujets. " +
-      "Style journalistique vivant, précis, sans publicité, sans citations inventées. " +
+      "Écris comme dans un vrai journal culturel : des faits d'abord, un angle précis, " +
+       "une syntaxe naturelle, des phrases de longueurs variées et des transitions sobres. " +
+       "Le lecteur doit apprendre quelque chose dès les premières lignes. " +
+       "N'écris pas un communiqué promotionnel ni un manifeste sur la musique live. " +
+       "Évite les clichés et formulations automatiques comme « donne le ton », " +
+       "« rendez-vous incontournable », « s'annonce riche », « au cœur de », " +
+       "« une chose est sûre », « de quoi ravir les fans », « promet », " +
+       "« reste à voir », « une soirée qui s'annonce », « plus que jamais ». " +
+       "Ne conclus pas systématiquement par une formule creuse ou une projection. " +
+       "Évite les métaphores forcées, les adjectifs non étayés, l'emphase et " +
+       "les répétitions du titre dans le chapô puis dans le premier paragraphe. " +
+       "Change réellement la construction selon le sujet : parfois une ouverture factuelle, " +
+       "parfois une conséquence concrète ou un détail significatif. " +
+       "Distingue faits attestés, analyse raisonnable et inconnues ; n'invente ni " +
+       "interview, ni réception du public, ni souvenir d'un concert non observé. " +
+       "N'attribue jamais une réaction ou une émotion au public sans source. " +
+       "Toute appréciation doit avoir une base factuelle et un intérêt journalistique. " +
       "Choisis une longueur adaptée au sujet : 220 à 450 mots pour une annonce simple, " +
        "500 à 1000 mots pour une actualité qui mérite du contexte, et 1000 à 2200 mots " +
        "pour un dossier, une analyse ou une enquête suffisamment documentée. " +
