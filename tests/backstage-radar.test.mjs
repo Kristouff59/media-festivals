@@ -462,7 +462,7 @@ assert.equal(partialReport.result,"article_a_valider",JSON.stringify(partialRepo
 assert.equal(partialReport.count,1);
 assert.equal(insertedDrafts.length,1);
 assert.equal(openaiCalls,2);
-assert.ok(partialReport.rejections.some(x=>x.reason==="article_ecarte_controle_qualite"));
+assert.ok(partialReport.rejections.some(x=>x.reason==="article_format_ou_contenu_invalide"));
 badSecondArticle=false;
 // En cas de grosse file d'attente, on conserve la capacité restante.
 pendingCount=39;
@@ -547,5 +547,32 @@ pressType = "text/html"; pressHTML = "a".repeat(700001);
 await checkPress({}, "presse_trop_volumineuse");
 pressThrows = true;
 await checkPress({}, "presse_inaccessible");
+
+// Régression 31 octobre : une section orpheline dans le JSON ne doit plus
+// faire disparaître un article, et un chapô de 382 caractères reste valide.
+const eligible=[{news:{topic_key:"motley-crue-graspop-2027-dimanche"}}];
+const repaired = checkCtx.normalizeWrittenArticles([
+  {topic_key:"motley-crue-graspop-2027-dimanche",title:"Mötley Crüe au Graspop 2027",
+   excerpt:"Annonce officielle de la programmation du Graspop Metal Meeting en 2027.",
+   category:"FESTIVALS",body:[
+     "Le Graspop Metal Meeting 2027 accueillera Mötley Crüe en tête d'affiche du dimanche.",
+     "Le groupe se produira pour la troisième fois au festival Graspop Metal Meeting."]},
+  {title:"Le retour du groupe",paragraphs:[
+     "Le groupe Mötley Crüe revient au festival pour son édition de 2027."]},
+],eligible);
+assert.equal(repaired.length,1);
+assert.equal(repaired[0].sections[0].title,"Le retour du groupe");
+assert.equal(checkCtx.normalizeWrittenArticles([
+  {title:"Une section sans article",paragraphs:["Texte isolé"]}], eligible).length,0);
+const longExcerpt = "Un chapô éditorial suffisamment détaillé pour décrire une annonce musicale sans qu'une limite arbitraire ne supprime l'article. ".repeat(3).slice(0,382);
+const validShape = {
+  title:"Evanescence deuxième tête d'affiche du vendredi à Graspop 2027",
+  excerpt:longExcerpt,category:"FESTIVALS",
+  body:Array(2).fill("Le festival Graspop annonce Evanescence pour son édition 2027. ".repeat(6)),
+  sections:[{title:"Un retour",paragraphs:Array(2).fill(
+    "La programmation du Graspop Metal Meeting 2027 confirme ce concert. ".repeat(6))}]
+};
+assert.equal(checkCtx.articleValid(validShape,
+  "Graspop Metal Meeting 2027 accueillera Evanescence."),true);
 
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication, diagnostics presse et noms courts");
