@@ -300,7 +300,7 @@ async function loadStaticArticles(){
    client.rpc('list_hidden_article_slugs')
   ]);
   if(hiddenResponse.error)throw hiddenResponse.error;
-  const match=page.match(/window\\.BACKSTAGE_CONTENT\\s*=\\s*(\\{[^\\n]+\\});/);
+  const match=page.match(/window\.BACKSTAGE_CONTENT\s*=\s*(\{[^\n]+\});/);
   if(!match)throw Error('Catalogue intégré introuvable');
   const hidden=new Set((hiddenResponse.data||[]).map(x=>x.slug));
   const items=(JSON.parse(match[1]).articles||[]).filter(x=>x.slug&&!hidden.has(x.slug));
