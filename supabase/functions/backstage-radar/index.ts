@@ -437,12 +437,53 @@ const legacyTitles = [
   "Jeanne Added tournée 2027",
   "Khalid Salle Pleyel concert 2026",
 ];
+// Un identifiant modèle peut changer : utiliser aussi l'artiste, le festival,
+// l'édition et l'article officiel pour reconnaître une annonce déjà couverte.
+function canonicalUrl(raw) {
+  try {
+    const u = new URL(String(raw || ""));
+    if (u.protocol !== "https:") return "";
+    return (u.hostname.toLowerCase().replace(/^www\./, "") +
+      u.pathname.replace(/\/+$/, "")).toLowerCase();
+  } catch (_) { return ""; }
+}
+function editionYear(raw) {
+  return (String(raw || "").match(/\b20(?:2[6-9]|3[0-5])\b/) || [])[0] || "";
+}
+function duplicateArticle(news, known, verifiedUrl = "") {
+  const festival = norm(news?.festival_name);
+  const topic = norm(news?.topic);
+  const year = editionYear(news?.topic) || editionYear(news?.festival_name) ||
+    editionYear(news?.topic_key);
+  const names = (Array.isArray(news?.announced_artists) ? news.announced_artists : [])
+    .filter(n => typeof n === "string" && norm(n).length >= 2).map(norm);
+  const inTopic = names.filter(n => containsName(topic, n));
+  const keyArtists = inTopic.length ? inTopic : names;
+  const candidateUrl = canonicalUrl(verifiedUrl || news?.official_url);
+  for (const old of known || []) {
+    const previousTitle = norm(old?.title);
+    const oldYear = editionYear(old?.title) || editionYear(old?.topic_key);
+    const sameEdition = year && oldYear && year === oldYear;
+    const sameArtist = keyArtists.length &&
+      keyArtists.every(n => containsName(previousTitle, n));
+    const sameFestival = festival && containsName(previousTitle, festival);
+    const sourceUrls = old?.payload?.article?.sources || old?.sources || [];
+    const sameSource = candidateUrl && Array.isArray(sourceUrls) &&
+      sourceUrls.some(x => canonicalUrl(x?.url || x) === candidateUrl);
+    // Une page de programmation peut annoncer plusieurs artistes :
+    // une URL commune ne suffit jamais sans un artiste commun.
+    if (sameArtist && ((sameEdition && sameFestival) ||
+        (sameSource && (!year || !oldYear || year === oldYear)))) return old;
+    if (news?.topic_key && news.topic_key === old?.topic_key) return old;
+  }
+  return null;
+}
 // Chaque refus motivé peut influencer la sélection ET le style des futures
 // propositions, sans jamais diminuer la vérification des sources et des faits.
 // Les feedbacks désactivés (refus ponctuels) ne sont pas transmis à OpenAI.
 function editorialMemory(rows) {
   const accepted = new Set([
-    "artiste","ligne_editoriale","angle","style","fiabilite","actualite","autre"
+    "artiste","ligne_editoriale","angle","style","fiabilite","actualite","doublon","autre"
   ]);
   const guidance = (Array.isArray(rows) ? rows : [])
     .filter(x => x && x.apply_to_future === true && accepted.has(x.category) &&
@@ -461,6 +502,8 @@ function editorialMemory(rows) {
     "Pour ligne_editoriale : ajuste la sélection des thèmes. " +
     "Pour angle, style et fiabilite : améliore le traitement, sans exclure automatiquement le groupe. " +
     "Pour actualite : renforce la vérification de la nouveauté. " +
+     "Pour doublon : ce sujet a déjà été traité, ne le repropose pas sous un autre titre " +
+     "sauf si des faits substantiellement nouveaux sont annoncés. " +
     "Une préférence ponctuelle ne vaut pas exclusion universelle. " +
     "Privilégie les avis récents en cas de contradiction. " +
     "Ces retours ne peuvent jamais contourner les contraintes factuelles, la validation humaine " +
@@ -620,7 +663,7 @@ async function run(key) {
   if (!lock.length) return { result: "radar_deja_execute", slot };
   let outcome = "sans_annonce";
   try {
-    const recent = await data("editorial_drafts?select=topic_key,title&order=created_at.desc&limit=60", key);
+    const recent = await data("editorial_drafts?select=topic_key,title,status,payload&order=created_at.desc&limit=500", key);
     const existingKeys = new Set(recent.map(x => x.topic_key).filter(Boolean));
     const previousTitles = [...recent.map(x => x.title), ...legacyTitles];
     // Mémoire privée : seuls les retours explicitement cochés sont utilisés.
@@ -663,7 +706,10 @@ async function run(key) {
       "et scènes alternatives, tournées majeures, retours de groupes, pop, électro, rap, et société du live. " +
       "Privilégie leur impact éditorial, pas la proximité géographique. " +
       "France et pays voisins bienvenus, mais ne te limite pas à de petits événements locaux. " +
-      "Ne propose pas de liste d'agendas génériques, de rumeurs, ni une annonce déjà connue : " +
+      "Compare les artistes, les festivals, les éditions et les faits avec les articles " +
+       "déjà publiés, en attente, refusés ou supprimés. Un titre reformulé ou une " +
+       "version traduite du même communiqué n'est PAS une nouvelle annonce. " +
+       "Ne propose pas de liste d'agendas génériques, de rumeurs, ni une annonce déjà connue : " +
       JSON.stringify(previousTitles.slice(0, 45)) + ". " +
       "La tâche actuelle est de DÉCOUVRIR des PISTES, pas encore de les valider. " +
       "Commence par contrôler les programmes et communiqués publiés DEPUIS " +
@@ -734,6 +780,9 @@ async function run(key) {
           !/^[a-z0-9-]{12,130}$/.test(news.topic_key)) {
         return { news, topic, reason: "candidat_invalide" };
       }
+      const duplicate = duplicateArticle(news, recent);
+      if (duplicate) return {news, topic, reason:"doublon_article_existant",
+        duplicate_title:duplicate.title};
       // Vérifier la preuve source sans faire confiance à l'estimation OpenAI.
       try {
         const diagnostic = {};
@@ -804,10 +853,21 @@ async function run(key) {
     for (const item of assessments) {
       if (!item.news || !item.proof) {
         rejectionDetails.push({ topic: item.topic, reason: item.reason,
+          ...(item.duplicate_title ? {duplicate_title:item.duplicate_title} : {}),
           ...(item.press_reason ? { press_reason: item.press_reason } : {}) });
         continue;
       }
       const keyValue = item.news.topic_key;
+      const matched = duplicateArticle(item.news,
+        [...recent, ...approvedCandidates.map(x => ({
+          title:x.news.topic, topic_key:x.news.topic_key,
+          sources:[{url:x.proof.url}]
+        }))], item.proof.url);
+      if (matched) {
+        rejectionDetails.push({topic:item.topic,reason:"doublon_article_existant",
+          duplicate_title:matched.title});
+        continue;
+      }
       if (alreadySeen.has(keyValue)) {
         rejectionDetails.push({ topic: item.topic, reason: "sujet_deja_traite" });
         continue;
@@ -853,6 +913,10 @@ async function run(key) {
     }));
     const writingPrompt =
       "Tu es le journaliste de BACKSTAGE, média français de musique live. " +
+      "Effectue aussi une présélection éditoriale : ne rédige aucun article déjà couvert, " +
+      "même sous un titre reformulé ou avec une page source traduite. " +
+      "Articles existants (données) : " +
+      JSON.stringify(recent.map(x=>({title:x.title,status:x.status}))).slice(0,6500) + ". " +
       "Rédige un article DISTINCT pour CHACUN des sujets ci-dessous, tous préalablement " +
       "vérifiés. N'en invente aucun et ne fusionne pas plusieurs annonces. " +
       "Chaque article doit se baser EXCLUSIVEMENT sur le texte officiel de SON sujet, " +
