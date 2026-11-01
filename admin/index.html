@@ -118,7 +118,7 @@ let client,drafts=[],selected=null,busy=false,feedbackByDraft={};
 const reasonLabels={
   artiste:'Artiste ou groupe',ligne_editoriale:'Hors ligne éditoriale',
   angle:'Angle ou sujet à revoir',style:'Style ou ton',
-  fiabilite:'Informations ou sources',actualite:'Actualité insuffisante',autre:'Autre raison'
+  fiabilite:'Informations ou sources',actualite:'Actualité insuffisante',doublon:'Doublon (article déjà publié)',autre:'Autre raison'
 };
 function setVisible(id,on){$(id).hidden=!on}
 function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé',deleted:'Supprimé'})[v]||v}
@@ -167,6 +167,11 @@ if(row.status==='pending'){
 }else{
  html+='<p class="pill">'+escapeHTML(statusName(row.status))+'</p>';
  const feedback=feedbackByDraft[row.id];
+ if(row.status==='rejected'&&data.duplicateReview){
+   html+='<div class="private-note"><strong>Doublon détecté</strong><p>'+
+     escapeHTML('Déjà traité : '+(data.duplicateReview.existing_title||'article précédent'))+
+     '</p></div>';
+ }
  if(row.status==='rejected'&&feedback){
    html+='<div class="private-note"><strong>Votre retour enregistré</strong>'+
      '<p>'+escapeHTML(reasonLabels[feedback.category]||'Retour éditorial')+'</p>'+
@@ -188,6 +193,12 @@ $('reject')?.addEventListener('click',()=>{
 $('cancel-rejection')?.addEventListener('click',()=>{
   $('rejection-editor').hidden=true;
   $('reject').hidden=false;
+});
+$('feedback-category')?.addEventListener('change',()=>{
+ if($('feedback-category').value==='doublon' && !$('feedback-reason').value.trim()){
+  $('feedback-reason').value="Cette annonce a déjà fait l'objet d'un article sur BACKSTAGE.";
+  $('feedback-future').checked=true;
+ }
 });
 $('reject-no-feedback')?.addEventListener('click',()=>decide(row,'rejected'));
 $('rejection-editor')?.addEventListener('submit',event=>{

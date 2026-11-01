@@ -591,4 +591,33 @@ assert.match(source, /const undated = assessments\.filter/);
 assert.match(source, /recherche_secondaire_sans_source_recevable/);
 assert.match(source, /const proof = await verify\(second, diagnostic\)/);
 assert.match(source, /La date recherchée est celle de l'ANNONCE/);
+// Régression du 1er novembre : même annonce / topic_key variable / URL traduite.
+const prevAnnouncements = [{
+  title:"Mötley Crüe fermeront le dimanche de Graspop Metal Meeting 2027",
+  topic_key:"graspop-2027-motley-crue-sunday-headliner-2026-10-28",
+  payload:{article:{sources:[{url:"https://press.graspop.be/the-first-headliner-for-sunday-20-june"}]}}
+},{
+  title:"Evanescence deuxième tête d’affiche du vendredi à Graspop Metal Meeting 2027",
+  topic_key:"evanescence-graspop-2027-vendredi",
+  payload:{article:{sources:[{url:"https://press.graspop.be/headliner-nummer-6-voor-gmm-2027"}]}}
+}];
+const makeNews=(artist,year,officialUrl)=>({
+ topic:"Graspop Metal Meeting annonce "+artist+" en "+year,
+ topic_key:"different-key-"+year+"-"+artist.toLowerCase().replace(/[^a-z]+/g,"-"),
+ festival_name:"Graspop Metal Meeting",
+ announced_artists:[artist],official_url:officialUrl
+});
+assert.ok(ctx.duplicateArticle(makeNews("Mötley Crüe",2027,
+  "https://press.graspop.be/the-first-headliner-for-sunday-20-june"),prevAnnouncements),
+  "Détecter l'article déjà publié même avec une nouvelle clé");
+assert.ok(ctx.duplicateArticle(makeNews("Evanescence",2027,
+  "https://press.graspop.be/sixieme-tete-daffiche-pour-le-gmm-2027"),prevAnnouncements),
+  "Deux URL de langues différentes ne créent pas deux sujets");
+assert.equal(ctx.duplicateArticle(makeNews("Judas Priest",2027,
+  "https://press.graspop.be/the-first-headliner-for-sunday-20-june"),prevAnnouncements),null,
+  "Ne pas assimiler d'autres artistes simplement parce qu'une URL est partagée");
+assert.equal(ctx.duplicateArticle(makeNews("Evanescence",2028,
+  "https://press.graspop.be/headliner-nummer-6-voor-gmm-2027"),prevAnnouncements),null,
+  "Une autre édition ne doit pas être rejetée");
+assert.match(source,/doublon_article_existant/);
 console.log("OK — authentification, absence de frais non autorisés, sources, article privé, pas de publication, diagnostics presse et noms courts");
