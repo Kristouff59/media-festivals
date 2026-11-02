@@ -274,3 +274,28 @@ test("Créneaux de découverte à 7 h et 18 h, heure de Paris, en hiver comme en
   assert.equal(parisSlot(new Date("2026-11-03T17:15:00Z")).id, "2026-11-03-soir");
   assert.equal(parisSlot(new Date("2026-11-03T10:00:00Z")).isDiscoveryHour, false);
 });
+
+// ------------------------------------------------------------------ Régressions issues du rejeu réel (3 nov. 2026)
+
+test("Rejeu réel : piste Mötley Crüe listant toute l'affiche → doublon de l'article Mötley, pas « mise à jour »", () => {
+  const cand = buildStory({
+    title: "Mötley Crüe annoncés comme closing act du dimanche de Graspop Metal Meeting 2027",
+    event_name: "Graspop Metal Meeting", edition: 2027, kind: "lineup",
+    artists: ["Mötley Crüe", "Parkway Drive", "Faith No More", "blink-182", "Marilyn Manson"],
+    official_url: "https://press.graspop.be/en/news/motley",
+  });
+  assert.deepEqual(cand.artists, ["motley crue"]);
+  const v = classifyStory(cand, [
+    { title: "Evanescence deuxième tête d'affiche du vendredi à Graspop Metal Meeting 2027", excerpt: "Avec Faith No More.", status: "published", created_at: "2026-11-01T06:00:00Z" },
+    { title: "Mötley Crüe fermeront le dimanche de Graspop Metal Meeting 2027", status: "published", created_at: "2026-11-01T06:00:00Z" },
+  ], { event_name: "Graspop Metal Meeting", artists: ["Mötley Crüe", "Parkway Drive", "Faith No More", "blink-182", "Marilyn Manson"] });
+  assert.equal(v.verdict, "duplicate");
+});
+
+test("Rejeu réel : deux pistes Massive Attack aux titres différents → la seconde est un doublon de la première piste", () => {
+  const first = buildStory({ title: "Rock Werchter ajoute Massive Attack en tête d'affiche du jeudi 1er juillet 2027",
+    event_name: "Rock Werchter", edition: 2027, kind: "lineup", artists: ["Massive Attack"], official_url: MA_URL });
+  const second = buildStory({ title: "Rock Werchter ajoute Massive Attack en tête d'affiche de l'ouverture",
+    event_name: "Rock Werchter", edition: null, kind: "lineup", artists: ["Massive Attack"], official_url: MA_URL });
+  assert.equal(classifyStory(second, [{ id: "lead:1", title: "x", story: first, status: "pending" }]).verdict, "duplicate");
+});

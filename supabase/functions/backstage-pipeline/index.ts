@@ -192,14 +192,26 @@ async function insertLeads(key: string, rows: any[]) {
 }
 
 // ---------------------------------------------------------------- Vérification
+/** Ce que BACKSTAGE couvre déjà : articles proposés ou publiés ET pistes déjà retenues. */
 async function knownArticles(key: string): Promise<KnownArticle[]> {
-  const drafts: any[] = await db("editorial_drafts?select=id,title,excerpt,status,created_at,story,payload" +
-    "&status=in.(pending,published)&order=created_at.desc&limit=600", key);
-  return drafts.map((d) => ({
-    id: d.id, title: d.title, excerpt: d.excerpt, status: d.status, created_at: d.created_at,
-    story: d.story ?? null,
-    source_urls: (d.payload?.article?.sources ?? []).map((s: any) => s?.url).filter(Boolean),
-  }));
+  const [drafts, leads]: any[][] = await Promise.all([
+    db("editorial_drafts?select=id,title,excerpt,status,created_at,story,payload" +
+      "&status=in.(pending,published)&order=created_at.desc&limit=600", key),
+    db("editorial_leads?select=id,title,official_url,verification,event_name,edition,kind,artists,places,created_at" +
+      "&status=in.(verified,needs_review,written)&order=created_at.desc&limit=400", key),
+  ]);
+  return [
+    ...drafts.map((d) => ({
+      id: d.id, title: d.title, excerpt: d.excerpt, status: d.status, created_at: d.created_at,
+      story: d.story ?? null,
+      source_urls: (d.payload?.article?.sources ?? []).map((s: any) => s?.url).filter(Boolean),
+    })),
+    ...leads.map((l) => {
+      const url = l.verification?.final_url || l.official_url;
+      return { id: "lead:" + l.id, title: l.title, status: "pending", created_at: l.created_at,
+        story: buildStory({ ...l, official_url: url }), source_urls: [url] };
+    }),
+  ];
 }
 
 function publicRecord(r: VerificationRecord) {
@@ -218,8 +230,9 @@ async function verifyQueue(key: string, deadline: number) {
   for (let i = 0; i < due.length && Date.now() < deadline - 15000; i += 4) {
     const group = due.slice(i, i + 4);
     // Un doublon évident n'a pas besoin d'être téléchargé : on le classe d'abord.
+    const others = (lead: any) => [...known, ...batch].filter((k) => k.id !== "lead:" + lead.id);
     const early = group.map((lead) => {
-      const v = classifyStory(buildStory(lead), [...known, ...batch], { event_name: lead.event_name, artists: lead.artists });
+      const v = classifyStory(buildStory(lead), others(lead), { event_name: lead.event_name, artists: lead.artists });
       return v.verdict === "duplicate" ? v : null;
     });
     const results = await Promise.all(group.map((lead, j) => early[j]
@@ -232,9 +245,9 @@ async function verifyQueue(key: string, deadline: number) {
       let verdict: any = early[j];
       if (status === "verified" || status === "needs_review") {
         const story = buildStory({ ...lead, official_url: rec.final_url || lead.official_url });
-        verdict = classifyStory(story, [...known, ...batch], { event_name: lead.event_name, artists: lead.artists });
+        verdict = classifyStory(story, others(lead), { event_name: lead.event_name, artists: lead.artists });
         if (verdict.verdict === "duplicate") status = "duplicate";
-        else batch.push({ title: lead.title, story, source_urls: [rec.final_url], status: "pending" });
+        else batch.push({ id: "lead:" + lead.id, title: lead.title, story, source_urls: [rec.final_url], status: "pending" });
       }
       if (status === "retry" && lead.attempts >= 3) status = "needs_review";
       counts[status === "verified" ? "verified" : status === "needs_review" ? "review" :

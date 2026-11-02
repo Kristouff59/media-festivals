@@ -137,6 +137,16 @@ ils s'exécutent dans Deno (Supabase) et dans Node (tests, CI).
 6. Après quelques jours concluants : ajouter le secret `BACKSTAGE_PIPELINE_MODE=live`
    et désactiver `backstage-radar-matin-soir`.
 
+## Premier essai réel (3 novembre 2026, mode fantôme)
+
+Migration appliquée, `backstage-pipeline` déployée (version 2), aucune donnée existante modifiée.
+Rejeu des 14 dernières découvertes v18 (28 pistes) : 7 annonces vérifiées
+(Massive Attack, Turnstile, Sam Fender, Angèle, Muse, SOMBR à Rock Werchter ; Santana),
+6 doublons écartés (Evanescence, Mötley Crüe, reformulations), blink-182 rejeté avec preuve
+(publié le 19 octobre, JSON-LD), Disturbed à examiner (dates contradictoires).
+Le rejeu a révélé deux défauts corrigés et couverts par des tests : doublons entre deux
+passages, et listes d'affiche complète prises pour les artistes annoncés.
+
 ## Ce qui reste à faire
 
 - Admin : un onglet « Pistes » (à examiner, rejetées, doublons) avec la preuve de date,

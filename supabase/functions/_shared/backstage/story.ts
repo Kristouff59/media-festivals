@@ -30,15 +30,25 @@ export type StoryVerdict =
 
 export const artistKey = (a: string) => norm(a).replace(/^the /, "");
 
+/**
+ * Les artistes qui FONT l'annonce. Une découverte liste parfois toute l'affiche
+ * citée sur la page ; seuls ceux nommés dans le titre de la piste comptent alors.
+ */
+export function keyArtists(title: string | undefined, artists: string[] = []): string[] {
+  if (!title) return artists;
+  const named = artists.filter((a) => containsName(title, a));
+  return named.length ? named : artists;
+}
+
 export function buildStory(input: {
-  event_name?: string; edition?: number | null; kind?: LeadKind;
+  title?: string; event_name?: string; edition?: number | null; kind?: LeadKind;
   artists?: string[]; places?: string[]; official_url: string;
 }): Story {
   return {
     event: eventTokens(input.event_name ?? "").join(" "),
     edition: input.edition ?? null,
     kind: input.kind ?? "other",
-    artists: [...new Set((input.artists ?? []).map(artistKey).filter(Boolean))].sort(),
+    artists: [...new Set(keyArtists(input.title, input.artists ?? []).map(artistKey).filter(Boolean))].sort(),
     places: [...new Set((input.places ?? []).map(norm).filter(Boolean))].sort(),
     official_url: input.official_url,
   };
@@ -101,7 +111,8 @@ export function classifyStory(
       artists = old.story.artists;
       places = old.story.places;
     } else {
-      const c = legacyCoverage(old, cand, raw.artists ?? [], raw.event_name ?? "");
+      const c = legacyCoverage(old, cand, cand.artists.length ? (raw.artists ?? []).filter((a) =>
+        cand.artists.includes(artistKey(a))) : [], raw.event_name ?? "");
       event = c.event; edition = c.edition; artists = c.artists;
     }
     const sameUrl = !!candUrl && (old.source_urls ?? []).some((u) => canonicalUrl(u) === candUrl);
