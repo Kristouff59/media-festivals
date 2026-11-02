@@ -647,7 +647,7 @@ async function rememberVerifiedSource(key, news, proof) {
 // Capacité de sûreté par passage (temps Edge Function et coût API).
 // Le plafond se règle en secret Supabase, sans changer le code.
 const MAX_PER_RUN = Math.min(8, Math.max(1, Number.parseInt(env("BACKSTAGE_MAX_ARTICLES") || "6",10) || 6));
-const MAX_CANDIDATES = 12;
+const MAX_CANDIDATES = 12; // validation stage
 const MAX_PENDING = 40;
 async function run(key) {
   const pending = await data("editorial_drafts?select=id&status=eq.pending&limit=40", key);
