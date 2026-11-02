@@ -247,9 +247,9 @@ async function recentPressCorroboration(news, officialContent, diagnostic = {}) 
   });
   if (!resp.ok) return reject("presse_http_" + resp.status);
   if (!/html/i.test(resp.headers.get("content-type") || "")) return reject("presse_non_html");
-  if (Number(resp.headers.get("content-length") || 0) > 700000) return reject("presse_trop_volumineuse");
+  if (Number(resp.headers.get("content-length") || 0) > 3000000) return reject("presse_trop_volumineuse");
   const html = await resp.text();
-  if (html.length > 700000) return reject("presse_trop_volumineuse");
+  if (html.length > 3000000) return reject("presse_trop_volumineuse");
   const pressText = norm(plain(html));
   if (pressText.length < 250) return reject("presse_trop_courte");
   if (!containsName(pressText, festival)) return reject("festival_absent_presse");
@@ -277,10 +277,10 @@ async function verify(news, diagnostic = {}) {
   });
   if (!r.ok) return reject("source_http_" + r.status);
   if (!/html/i.test(r.headers.get("content-type") || "")) return reject("source_non_html");
-  if (Number(r.headers.get("content-length") || 0) > 1200000)
+  if (Number(r.headers.get("content-length") || 0) > 3000000)
     return reject("source_trop_volumineuse");
   const html = await r.text();
-  if (html.length > 1200000) return reject("source_trop_volumineuse");
+  if (html.length > 3000000) return reject("source_trop_volumineuse");
   const publication = officialPublishedDate(html);
   const source = plain(html), normalized = norm(source);
   if (normalized.length < 250) return reject("source_trop_courte");
@@ -597,9 +597,9 @@ async function officialFestivalSignals(key) {
       });
       if (!response.ok || !/html/i.test(response.headers.get("content-type") || ""))
         return null;
-      if (Number(response.headers.get("content-length") || 0) > 700000) return null;
+      if (Number(response.headers.get("content-length") || 0) > 3000000) return null;
       const html = await response.text();
-      if (html.length > 700000) return null;
+      if (html.length > 3000000) return null;
       const content = plain(html);
       if (content.length < 90) return null;
       const lower = content.toLowerCase();
