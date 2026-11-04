@@ -1,0 +1,12 @@
+{
+  "name": "flechettes-tournois",
+  "version": "1.0.0",
+  "description": "Organisation complète de tournois de fléchettes : inscriptions, poules, planification des cibles, résultats 501 / Cricket / Cut-Throat, classements, phases finales, temps réel.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server/server.js",
+    "test": "node --test test/*.test.js"
+  }
+}

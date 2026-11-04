@@ -1,0 +1,25 @@
+name: Fléchettes — tests
+on:
+  push:
+    paths: ['flechettes/**', '.github/workflows/flechettes.yml']
+  pull_request:
+    paths: ['flechettes/**', '.github/workflows/flechettes.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: flechettes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vérifier la syntaxe des fichiers JavaScript
+        run: for f in $(find src public -name '*.js'); do node --check "$f" || exit 1; done
+      - name: Tests (moteur métier, scénario de référence, serveur)
+        run: npm test
