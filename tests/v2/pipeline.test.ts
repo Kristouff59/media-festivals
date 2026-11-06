@@ -10,6 +10,7 @@ const FIXED = Date.parse("2026-11-02T06:15:00Z"); // 7 h 15 à Paris, le jour de
 const realNow = Date.now;
 
 type Row = Record<string, any>;
+let loads = 0;
 function harness(mode: "shadow" | "live") {
   const tables: Record<string, Row[]> = {
     editorial_radar_runs: [], editorial_ai_logs: [], editorial_leads: [], editorial_drafts: [],
@@ -89,7 +90,8 @@ function harness(mode: "shadow" | "live") {
   Date.now = () => FIXED;
   return {
     tables, web, get openaiCalls() { return openaiCalls; },
-    load: async () => { await import("../../supabase/functions/backstage-pipeline/index.ts?" + mode); },
+    // Chaque test charge sa propre instance de la fonction (le module est mis en cache par URL).
+    load: async () => { await import("../../supabase/functions/backstage-pipeline/index.ts?" + mode + "-" + (++loads)); },
     call: async (body: unknown, key = "sb_secret_test") => {
       const r = await handler!(new Request("https://x/functions/v1/backstage-pipeline",
         { method: "POST", headers: { apikey: key }, body: JSON.stringify(body) }));
@@ -156,5 +158,27 @@ test("Mode réel : la piste vérifiée devient UN article pending, avec preuves 
   assert.equal(draft.quality.verification.date_evidence_type, "sous_le_titre");
   assert.equal(h.tables.editorial_leads[0].status, "written");
   assert.equal(h.tables.editorial_leads[0].draft_id, draft.id);
+  Date.now = realNow;
+});
+
+test("Mode réel : une piste déjà couverte par un article publié n'est pas rédigée (aucun appel OpenAI)", async () => {
+  const h = harness("live");
+  await h.load();
+  h.tables.editorial_drafts.push({ id: "d-hell", title: "Helloween complète l'affiche des têtes d'affiche de Graspop Metal Meeting 2027",
+    excerpt: "", status: "pending", created_at: "2026-11-05T17:00:00Z", payload: { article: { sources: [] } } });
+  h.tables.editorial_leads.push({
+    id: "lead-h", status: "verified", shadow: false, draft_id: null, attempts: 1, priority: 80,
+    title: "Graspop Metal Meeting révèle Helloween comme dernière tête d'affiche de GMM 2027",
+    official_url: "https://press.graspop.be/la-derniere-tete-daffiche-du-gmm-2027", event_name: "Graspop Metal Meeting",
+    edition: 2027, kind: "lineup", artists: ["Helloween"], places: [], publication_date: "2026-11-01",
+    source_text: "Helloween au Graspop Metal Meeting 2027.", verification: { corroborating_sources: [] },
+    next_attempt_at: new Date(FIXED + 86400000).toISOString(),
+  });
+  h.tables.editorial_radar_runs.push({ slot: "v2-2026-11-02-matin" });
+  const res = await h.call({ stage: "tick" });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  assert.equal(h.openaiCalls, 0);
+  assert.equal(h.tables.editorial_leads[0].status, "duplicate");
+  assert.equal(h.tables.editorial_drafts.length, 1);
   Date.now = realNow;
 });

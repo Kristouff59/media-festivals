@@ -213,7 +213,7 @@ async function knownArticles(key: string): Promise<KnownArticle[]> {
     ...leads.map((l) => {
       const url = l.verification?.final_url || l.official_url;
       return { id: "lead:" + l.id, title: l.title, created_at: l.created_at,
-        status: l.status === "rejected" ? "deja_annonce" : "pending",
+        status: l.status === "rejected" ? "deja_annonce" : l.status,
         story: buildStory({ ...l, official_url: url }), source_urls: [url] };
     }),
   ];
@@ -318,8 +318,20 @@ async function writeQueue(key: string, slot: string, deadline: number, guidance:
   const ready: any[] = await db("editorial_leads?select=*&status=eq.verified&draft_id=is.null&shadow=is.false" +
     "&order=priority.desc,publication_date.desc&limit=4", key);
   const created: { title: string; id: string }[] = [];
+  const known = ready.length ? await knownArticles(key) : [];
   for (const lead of ready) {
     if (Date.now() > deadline - 65000) break; // pas de rédaction entamée sans marge
+    // Dernier contrôle avant de payer une rédaction : un article a pu paraître entre-temps.
+    const leadStory = buildStory({ ...lead, official_url: lead.verification?.final_url || lead.official_url });
+    const check = classifyStory(leadStory, known.filter((k) =>
+      !String(k.id).startsWith("lead:") || k.status === "written" || k.status === "deja_annonce"),
+      { event_name: lead.event_name, artists: lead.artists });
+    if (check.verdict === "duplicate") {
+      await db("editorial_leads?id=eq." + lead.id, key, "PATCH", { status: "duplicate", rejection_reason: "doublon_avant_redaction",
+        story_verdict: { verdict: "duplicate", of: check.of.title, of_id: check.of.id ?? null, reason: check.reason },
+        updated_at: new Date().toISOString() }, "return=minimal");
+      continue;
+    }
     let art: any;
     try {
       const words = lead.source_text?.length > 7000 ? 14000 : 7000;
@@ -410,6 +422,8 @@ async function tick(key: string, input: any) {
   const report: Record<string, unknown> = { mode: MODE };
   const slot = parisSlot(new Date(Date.now()));
   const discoveryDue = input.stage === "discover" || (slot.isDiscoveryHour);
+  // Un lancement manuel hors créneau ne doit pas consommer le créneau 7 h / 18 h.
+  if (!slot.isDiscoveryHour) slot.id = "manuel-" + new Date(Date.now()).toISOString().slice(0, 16);
   if (discoveryDue) {
     const lock = await db("editorial_radar_runs?on_conflict=slot", key, "POST",
       [{ slot: "v2-" + slot.id, status: "running" }], "resolution=ignore-duplicates,return=representation");
