@@ -1,0 +1,55 @@
+// BACKSTAGE v2 — conversions pures, testables sans Supabase ni OpenAI.
+import { buildStory, storyKey } from "../_shared/backstage/story.ts";
+import { canonicalUrl } from "../_shared/backstage/text.ts";
+import type { LeadKind } from "../_shared/backstage/verify.ts";
+
+/** Créneau de découverte : 7 h et 18 h à Paris, été comme hiver. */
+export function parisSlot(d: Date) {
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false,
+  }).formatToParts(d);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const hour = Number(get("hour"));
+  const day = `${get("year")}-${get("month")}-${get("day")}`;
+  return { id: day + (hour < 13 ? "-matin" : "-soir"), hour, isDiscoveryHour: hour === 7 || hour === 18 };
+}
+
+/**
+ * Convertit la sortie JSON d'une découverte v18 (editorial_ai_logs.response_text)
+ * en pistes v2. Permet de rejouer gratuitement de vraies découvertes.
+ */
+export function leadsFromV18Discovery(responseText: string) {
+  let parsed: any;
+  try {
+    const t = String(responseText || "");
+    parsed = JSON.parse(t.slice(t.indexOf("{"), t.lastIndexOf("}") + 1));
+  } catch {
+    return [];
+  }
+  const items: any[] = Array.isArray(parsed?.candidates) ? parsed.candidates : [];
+  return items.filter((c) => typeof c?.official_url === "string" && /^https:\/\//.test(c.official_url)).map((c) => {
+    const year = String(c.topic ?? "").match(/\b20(2[6-9]|3\d)\b/);
+    const kind: LeadKind = c.festival_name ? "lineup" : /tourn|tour/i.test(c.topic) ? "tour" : "other";
+    return {
+      channel: "openai", title: String(c.topic ?? "").slice(0, 300), why_now: c.why_now ?? null,
+      official_url: c.official_url, event_name: c.festival_name || "", edition: year ? Number(year[0]) : null,
+      kind, artists: Array.isArray(c.announced_artists) ? c.announced_artists : [], places: [],
+      press_urls: c.press_url ? [c.press_url] : [], claimed_publication_date: null, priority: 50, listing_hint: null,
+    };
+  });
+}
+
+export function leadRow(l: any, slot: string, shadow: boolean) {
+  const story = buildStory({ ...l, official_url: l.official_url });
+  return {
+    channel: l.channel ?? "openai", shadow, status: "new",
+    title: String(l.title || "").slice(0, 300), why_now: l.why_now ?? null,
+    official_url: l.official_url, canonical_url: canonicalUrl(l.official_url),
+    event_name: l.event_name || null, edition: Number.isInteger(l.edition) ? l.edition : null,
+    kind: l.kind ?? "other", artists: (l.artists ?? []).slice(0, 20), places: (l.places ?? []).slice(0, 20),
+    press_urls: (l.press_urls ?? []).filter((u: string) => /^https:\/\//.test(u)).slice(0, 3),
+    claimed_publication_date: /^\d{4}-\d{2}-\d{2}$/.test(l.claimed_publication_date ?? "") ? l.claimed_publication_date : null,
+    listing_hint: l.listing_hint ?? null, priority: Math.max(0, Math.min(100, l.priority ?? 50)),
+    story_key: storyKey(story), discovered_slot: slot,
+  };
+}
