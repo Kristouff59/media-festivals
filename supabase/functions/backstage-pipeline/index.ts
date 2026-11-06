@@ -197,8 +197,12 @@ async function knownArticles(key: string): Promise<KnownArticle[]> {
   const [drafts, leads]: any[][] = await Promise.all([
     db("editorial_drafts?select=id,title,excerpt,status,created_at,story,payload" +
       "&status=in.(pending,published)&order=created_at.desc&limit=600", key),
-    db("editorial_leads?select=id,title,official_url,verification,event_name,edition,kind,artists,places,created_at" +
-      "&status=in.(verified,needs_review,written)&order=created_at.desc&limit=400", key),
+    // Une piste rejetée parce que l'annonce est ancienne prouve que le sujet est DÉJÀ sorti :
+    // une page plus récente qui le cite à nouveau (ex. blink-182 rappelé dans l'annonce
+    // de Marilyn Manson, 26/10) n'est pas une nouvelle.
+    db("editorial_leads?select=id,title,official_url,verification,event_name,edition,kind,artists,places,created_at,status,rejection_reason" +
+      "&or=(status.in.(verified,needs_review,written),rejection_reason.eq.annonce_trop_ancienne)" +
+      "&order=created_at.desc&limit=400", key),
   ]);
   return [
     ...drafts.map((d) => ({
@@ -208,7 +212,8 @@ async function knownArticles(key: string): Promise<KnownArticle[]> {
     })),
     ...leads.map((l) => {
       const url = l.verification?.final_url || l.official_url;
-      return { id: "lead:" + l.id, title: l.title, status: "pending", created_at: l.created_at,
+      return { id: "lead:" + l.id, title: l.title, created_at: l.created_at,
+        status: l.status === "rejected" ? "deja_annonce" : "pending",
         story: buildStory({ ...l, official_url: url }), source_urls: [url] };
     }),
   ];

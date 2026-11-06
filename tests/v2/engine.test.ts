@@ -299,3 +299,14 @@ test("Rejeu réel : deux pistes Massive Attack aux titres différents → la sec
     event_name: "Rock Werchter", edition: null, kind: "lineup", artists: ["Massive Attack"], official_url: MA_URL });
   assert.equal(classifyStory(second, [{ id: "lead:1", title: "x", story: first, status: "pending" }]).verdict, "duplicate");
 });
+
+test("Rejeu réel (5 nov.) : blink-182 rappelé dans l'annonce Marilyn Manson du 26/10 → déjà annoncé le 19/10, pas une nouvelle", () => {
+  const old = buildStory({ title: "blink-182 tête d'affiche du 30e Graspop Metal Meeting", event_name: "Graspop Metal Meeting",
+    edition: 2027, kind: "lineup", artists: ["blink-182"],
+    official_url: "https://press.graspop.be/first-headliner-for-the-30th-edition-of-graspop-metal-meeting-announced" });
+  const cand = buildStory({ title: "Blink-182 annoncés comme headliner du samedi à Graspop Metal Meeting 2027",
+    event_name: "Graspop Metal Meeting", edition: 2027, kind: "lineup", artists: ["blink-182"],
+    official_url: "https://press.graspop.be/een-nieuwe-headliner-voor-zaterdag-19-juni" });
+  const v = classifyStory(cand, [{ id: "lead:old", title: "blink-182 (19/10)", story: old, status: "deja_annonce" }]);
+  assert.equal(v.verdict, "duplicate");
+});
