@@ -39,17 +39,26 @@ export function leadsFromV18Discovery(responseText: string) {
   });
 }
 
+const KINDS = ["lineup", "tour", "concert", "cancellation", "industry", "other"];
+
+/**
+ * Nettoie une piste avant insertion : une seule valeur hors des contraintes de la table
+ * (ex. edition = 35 pour « 35 years ») faisait échouer TOUT le passage du 11 novembre.
+ */
 export function leadRow(l: any, slot: string, shadow: boolean) {
+  const edition = Number.isInteger(l.edition) && l.edition >= 2020 && l.edition <= 2040 ? l.edition : null;
+  const kind = KINDS.includes(l.kind) ? l.kind : "other";
+  l = { ...l, edition, kind };
   const story = buildStory({ ...l, official_url: l.official_url });
   return {
     channel: l.channel ?? "openai", shadow, status: "new",
     title: String(l.title || "").slice(0, 300), why_now: l.why_now ?? null,
     official_url: l.official_url, canonical_url: canonicalUrl(l.official_url),
-    event_name: l.event_name || null, edition: Number.isInteger(l.edition) ? l.edition : null,
+    event_name: l.event_name ? String(l.event_name).slice(0, 200) : null, edition,
     kind: l.kind ?? "other", artists: (l.artists ?? []).slice(0, 20), places: (l.places ?? []).slice(0, 20),
     press_urls: (l.press_urls ?? []).filter((u: string) => /^https:\/\//.test(u)).slice(0, 3),
     claimed_publication_date: /^\d{4}-\d{2}-\d{2}$/.test(l.claimed_publication_date ?? "") ? l.claimed_publication_date : null,
-    listing_hint: l.listing_hint ?? null, priority: Math.max(0, Math.min(100, l.priority ?? 50)),
+    listing_hint: l.listing_hint ?? null, priority: Math.max(0, Math.min(100, Math.round(Number(l.priority) || 50))),
     story_key: storyKey(story), discovered_slot: slot,
   };
 }

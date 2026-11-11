@@ -310,3 +310,23 @@ test("Rejeu réel (5 nov.) : blink-182 rappelé dans l'annonce Marilyn Manson du
   const v = classifyStory(cand, [{ id: "lead:old", title: "blink-182 (19/10)", story: old, status: "deja_annonce" }]);
   assert.equal(v.verdict, "duplicate");
 });
+
+test("Passage du 11 nov. : une édition aberrante (« 35 years ») ne fait plus échouer l'insertion", () => {
+  const row = leadRow({ title: "Neon Trees au Magnificent Mile Lights Festival", official_url: "https://www.globenewswire.com/x",
+    edition: 35, kind: "festival", priority: 72.6, artists: ["Neon Trees"] }, "2026-11-11-soir", false);
+  assert.equal(row.edition, null);
+  assert.equal(row.kind, "other");
+  assert.equal(row.priority, 73);
+});
+
+test("Rock en Seine 2027 : l'annulation est reconnue comme déjà couverte, une annonce de programmation non", () => {
+  const cancel = buildStory({ event_name: "Rock en Seine", edition: 2027, kind: "cancellation", artists: [],
+    official_url: "https://www.dhnet.be/x" });
+  const known = [{ id: "d1", title: "Rock en Seine fait une pause en 2027", status: "pending", story: cancel }];
+  const again = buildStory({ event_name: "Rock en Seine", edition: 2027, kind: "cancellation", artists: [],
+    official_url: "https://www.leparisien.fr/y" });
+  assert.equal(classifyStory(again, known).verdict, "duplicate");
+  const edition2028 = buildStory({ event_name: "Rock en Seine", edition: 2028, kind: "cancellation", artists: [],
+    official_url: "https://www.leparisien.fr/z" });
+  assert.equal(classifyStory(edition2028, known).verdict, "new");
+});
