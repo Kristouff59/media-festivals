@@ -112,3 +112,8 @@ $$;
 revoke all on function public.trim_editorial_leads() from public, anon, authenticated;
 
 notify pgrst, 'reload schema';
+
+-- 5. Journal des appels : la veille dédiée aux grands festivals a son propre libellé.
+alter table public.editorial_ai_logs drop constraint if exists editorial_ai_logs_stage_check;
+alter table public.editorial_ai_logs add constraint editorial_ai_logs_stage_check
+  check (stage = any (array['decouverte'::text, 'redaction'::text, 'veille_festivals'::text]));
