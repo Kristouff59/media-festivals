@@ -2,476 +2,718 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="theme-color" content="#111716">
+<meta name="theme-color" content="#0f1513">
 <title>BACKSTAGE — Rédaction</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,"Segoe UI",Arial,sans-serif;--bg:#101614;--card:#1c2420;--stroke:#35413a;--text:#f5f6ed;--muted:#b3c1b6;--accent:#d3f177}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-size:16px}
-a{color:var(--accent)}button,input,textarea,select{font:inherit}button{cursor:pointer}
-header{border-bottom:1px solid var(--stroke);padding:20px max(20px,calc((100vw - 1100px)/2));display:flex;justify-content:space-between;gap:15px;align-items:center}
-.brand{font-size:22px;letter-spacing:.06em;font-weight:900;text-decoration:none;color:var(--text)}
-main{max-width:1100px;margin:35px auto 100px;padding:0 20px}
-h1{font-size:clamp(30px,4vw,48px);line-height:1.05;margin:8px 0 12px;letter-spacing:-.03em}
-.eyebrow{font-size:12px;letter-spacing:.2em;font-weight:750;text-transform:uppercase;color:var(--accent)}
-.muted{color:var(--muted)}.panel{background:var(--card);border:1px solid var(--stroke);border-radius:14px;padding:25px}
-.pill{font-size:12px;border-radius:30px;padding:6px 10px;border:1px solid var(--stroke);display:inline-block;color:var(--muted)}
-button{background:var(--accent);color:#151913;border:0;border-radius:8px;padding:13px 16px;font-weight:750}
-button:disabled{opacity:.4;cursor:not-allowed}
-button.secondary{background:transparent;color:var(--text);border:1px solid var(--stroke)}
-button.danger{background:#422a2a;color:#fce6e6}
-.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-.formfield{display:block;margin:20px 0 12px;color:var(--muted)}
-input:not([type="checkbox"]),textarea,select{display:block;width:100%;max-width:640px;border-radius:8px;border:1px solid var(--stroke);padding:13px;background:#0d100f;color:white}
-textarea{min-height:125px;resize:vertical;line-height:1.5}
-#rejection-editor{width:100%;padding:16px;border:1px solid var(--stroke);border-radius:10px;margin-top:14px;background:#141b18}
-#rejection-editor[hidden],#radar-diagnostics[hidden]{display:none}
-#radar-diagnostics{margin:12px 0;background:var(--card);padding:14px 16px;border:1px solid var(--stroke);border-radius:10px}
-#radar-diagnostics summary{cursor:pointer;font-weight:700;color:var(--accent)}
-#radar-diagnostics p{line-height:1.6;color:var(--muted);font-size:14px;overflow-wrap:anywhere}
-#ai-logs-panel,#sources-panel{margin:16px 0 10px}
-#sources-panel>summary{cursor:pointer;font-size:17px;font-weight:750}
-#source-registry-list{display:grid;gap:8px;margin-top:12px}
-.source-registry-item{padding:10px 12px;background:#141b18;border:1px solid var(--stroke);border-radius:9px}
-.source-registry-item strong{font-size:14px}
-.source-registry-item p{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.45}
-#ai-logs-panel>summary{cursor:pointer;font-size:17px;font-weight:750}
-#ai-logs-panel .ai-log{background:#141b18;border:1px solid var(--stroke);border-radius:9px;padding:12px;margin:10px 0}
-#ai-logs-panel .ai-log summary{cursor:pointer;font-size:14px;font-weight:700;line-height:1.6}
-#ai-logs-panel .ai-log p,#ai-log-list>p{color:var(--muted);font-size:13px;line-height:1.5}
-#ai-logs-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow-y:auto;background:#0d100f;border:1px solid var(--stroke);padding:12px;border-radius:7px;font:12px/1.5 ui-monospace,Consolas,monospace;color:var(--text)}
-#ai-logs-panel .ai-label{font-weight:700;margin-top:14px;color:var(--accent);font-size:13px}
-#rejection-editor label{display:block;margin:12px 0 6px;font-weight:700}
-#rejection-editor .small-help{font:13px/1.5 Inter,"Segoe UI",sans-serif;color:var(--muted);margin:5px 0 14px}
-.feedback-switch{display:flex!important;align-items:start;gap:10px;line-height:1.4;max-width:650px}
-.feedback-switch input{flex:none;margin-top:4px;width:18px;height:18px}
-.private-note{margin-top:20px;border-left:3px solid var(--accent);padding:12px 16px;background:#202b22}
-.private-note p{font:15px/1.55 Inter,"Segoe UI",sans-serif}
+:root{
+  color-scheme:dark;
+  --bg:#0f1513;--bg2:#141c19;--card:#1a231f;--card2:#212c27;--stroke:#2f3b35;--stroke2:#3d4b44;
+  --text:#f3f5ec;--muted:#a9b8ad;--faint:#7d8c82;
+  --accent:#d3f177;--accent-ink:#141a10;
+  --ok:#8fe3a1;--warn:#f4c76a;--bad:#ff9a8a;--bad-bg:#3a2523;
+  --radius:14px;--bar:76px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  font-family:Inter,"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+body{font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+a{color:var(--accent)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 
-#alert{margin:20px 0;min-height:15px}#alert:not(:empty){padding:14px;border:1px solid var(--stroke);border-radius:8px}
-#layout{display:grid;grid-template-columns:minmax(245px,320px) minmax(0,1fr);gap:24px;margin-top:28px}
-#drafts{display:flex;flex-direction:column;gap:10px}
-.draft{display:block;width:100%;text-align:left;background:var(--card);color:var(--text);border:1px solid var(--stroke);padding:15px;border-radius:10px}
-.draft.active{border-color:var(--accent);background:#273126}
-.draft strong{display:block;line-height:1.35;margin:9px 0;font-size:15px}
-.draft .muted{font-size:12px}
-.article{max-width:720px}.article h2{font-size:clamp(27px,3vw,38px);line-height:1.15;letter-spacing:-.028em}
-.article h3{font-size:21px;margin-top:40px}
-.article p{font:18px/1.75 Georgia,serif;color:#eeefea}
-.article .deck{font:19px/1.55 Inter,"Segoe UI",sans-serif;color:#e0e5dc}
-.article .bodyparagraph{margin:22px 0}
-.source-list{padding-left:22px;line-height:1.9}
-.actions{position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--stroke);padding:16px 0;margin-top:30px}
-.empty{color:var(--muted);padding:25px 0}
-@media(max-width:750px){#layout{grid-template-columns:1fr}header{padding:18px}main{margin-top:25px}.article p{font-size:17px}}
+/* ---------- En-tête ---------- */
+.top{position:sticky;top:0;z-index:20;background:rgba(15,21,19,.94);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--stroke);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 0}
+.top-row{display:flex;align-items:center;gap:10px;min-height:40px}
+.brand{font-weight:900;letter-spacing:.06em;font-size:19px;color:var(--text);text-decoration:none}
+.brand span{color:var(--accent)}
+.top-row .spacer{flex:1}
+.icon-btn{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--muted);border:1px solid var(--stroke)}
+.icon-btn:active{background:var(--card)}
+.icon-btn svg{width:20px;height:20px}
+.tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;margin:8px -16px 0;padding:0 12px}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;padding:12px 12px 11px;font-weight:700;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--text);border-color:var(--accent)}
+.badge{display:inline-block;min-width:20px;padding:1px 6px;margin-left:5px;border-radius:20px;background:var(--card2);color:var(--muted);font-size:12px;text-align:center}
+.tab[aria-selected="true"] .badge,.badge.hot{background:var(--accent);color:var(--accent-ink)}
+
+/* ---------- Mise en page ---------- */
+.app{max-width:1240px;margin:0 auto}
+.layout{display:block}
+.list-pane{padding:12px 16px calc(24px + var(--safe-b))}
+.reader-pane{display:none}
+body.reading .list-pane{display:none}
+body.reading .reader-pane{display:block}
+@media(min-width:900px){
+  .layout{display:grid;grid-template-columns:380px minmax(0,1fr);min-height:calc(100vh - 110px)}
+  .list-pane{border-right:1px solid var(--stroke);height:calc(100vh - 110px);overflow-y:auto;position:sticky;top:110px}
+  .reader-pane,body.reading .reader-pane{display:block}
+  body.reading .list-pane{display:block}
+  .back-btn{display:none!important}
+}
+
+/* ---------- Bandeau d'état ---------- */
+.status-line{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin:2px 0 12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.run{background:var(--warn)}
+
+/* ---------- Cartes de liste ---------- */
+.cards{display:flex;flex-direction:column;gap:10px}
+.card{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--stroke);border-radius:var(--radius);padding:14px 15px}
+.card:active{background:var(--card2)}
+.card.active{border-color:var(--accent);background:#222d22}
+.card-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+.card h3{margin:8px 0 6px;font-size:16px;line-height:1.3;font-weight:750}
+.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.chip{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:2px 8px;font-size:12px;font-weight:650;border:1px solid var(--stroke2);color:var(--muted)}
+.chip.ok{color:var(--ok);border-color:#3d5b45}.chip.warn{color:var(--warn);border-color:#5d4e2c}.chip.bad{color:var(--bad);border-color:#5d3631}
+.chip.accent{color:var(--accent);border-color:#4f5c2f}
+.empty{padding:32px 10px;text-align:center;color:var(--muted)}
+.empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
+.more{width:100%;margin-top:10px;padding:12px;border:1px dashed var(--stroke2);border-radius:12px;color:var(--muted)}
+.search{width:100%;margin:0 0 12px;padding:11px 13px;border-radius:11px;border:1px solid var(--stroke);background:var(--bg2)}
+
+/* ---------- Lecteur ---------- */
+.reader{max-width:760px;margin:0 auto;padding:14px 18px calc(var(--bar) + 40px + var(--safe-b))}
+@media(min-width:900px){.reader{padding:28px 40px calc(var(--bar) + 40px)}}
+.back-btn{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-weight:650;padding:8px 2px;margin-bottom:6px}
+.reader .kicker{font-size:12px;letter-spacing:.16em;font-weight:800;text-transform:uppercase;color:var(--accent)}
+.reader h1{font-size:clamp(25px,6vw,38px);line-height:1.12;letter-spacing:-.02em;margin:8px 0 12px}
+.reader .deck{font-size:18px;line-height:1.5;color:#dfe5da;margin:0 0 18px}
+.reader .body p{font:17.5px/1.72 Georgia,"Times New Roman",serif;color:#eceee7;margin:0 0 18px}
+.reader .body h2{font-size:20px;margin:30px 0 10px;line-height:1.25}
+.reader figure{margin:18px 0}.reader figure img{width:100%;height:auto;border-radius:10px;display:block}
+.reader figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+.meta-line{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.box{background:var(--bg2);border:1px solid var(--stroke);border-radius:12px;padding:13px 14px;margin:16px 0}
+.box h4{margin:0 0 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.box ul{margin:0;padding-left:18px}.box li{margin:4px 0;font-size:14px;line-height:1.45}
+.box p{margin:4px 0;font-size:14px;line-height:1.5}
+.box.warn{border-color:#5d4e2c;background:#211e14}.box.warn h4{color:var(--warn)}
+.box.proof h4{color:var(--ok)}
+.sources a{overflow-wrap:anywhere}
+details.box summary{cursor:pointer;font-weight:700;font-size:14px}
+details.box[open] summary{margin-bottom:8px}
+
+/* ---------- Barre d'actions fixe ---------- */
+.actionbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(20,28,25,.97);backdrop-filter:blur(10px);
+  border-top:1px solid var(--stroke);padding:10px 14px calc(10px + var(--safe-b));display:flex;gap:10px;align-items:center}
+@media(min-width:900px){.actionbar{position:sticky;left:auto;right:auto;bottom:0;margin-top:-1px}
+  .reader{padding-bottom:40px}}
+.actionbar .grow{flex:1}
+.btn{min-height:48px;padding:0 18px;border-radius:12px;font-weight:800;font-size:15px;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn-primary{background:var(--accent);color:var(--accent-ink);flex:1.4}
+.btn-ghost{border:1px solid var(--stroke2);color:var(--text);flex:1}
+.btn-danger{background:var(--bad-bg);color:#ffd9d2;flex:1}
+.btn-more{width:48px;flex:none;border:1px solid var(--stroke2);color:var(--muted)}
+.btn.confirm{outline:3px solid #fff3;animation:pulse 1s infinite}
+.btn:disabled{opacity:.45}
+@keyframes pulse{50%{filter:brightness(1.15)}}
+
+/* ---------- Feuilles (refus, images, plus) ---------- */
+.sheet-bg{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.55)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:41;background:var(--card);border-radius:18px 18px 0 0;border:1px solid var(--stroke);
+  max-height:88vh;overflow-y:auto;padding:8px 18px calc(18px + var(--safe-b))}
+@media(min-width:900px){.sheet{left:50%;right:auto;bottom:auto;top:50%;transform:translate(-50%,-50%);width:560px;border-radius:18px}}
+.grab{width:42px;height:5px;border-radius:5px;background:var(--stroke2);margin:4px auto 12px}
+.sheet h2{font-size:19px;margin:4px 0 6px}
+.sheet .help{color:var(--muted);font-size:14px;margin:0 0 12px}
+.reasons{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
+.reason{padding:9px 12px;border-radius:20px;border:1px solid var(--stroke2);font-size:14px;font-weight:650;color:var(--muted)}
+.reason[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+label.f{display:block;font-weight:700;font-size:14px;margin:12px 0 6px}
+.input,textarea.input{width:100%;padding:12px 13px;border-radius:11px;border:1px solid var(--stroke2);background:var(--bg)}
+textarea.input{min-height:96px;resize:vertical;line-height:1.5}
+.check{display:flex;gap:10px;align-items:flex-start;margin:12px 0;font-size:14px;color:var(--muted)}
+.check input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--accent)}
+.sheet-actions{display:flex;gap:10px;margin:16px -18px 0;padding:12px 18px calc(4px + var(--safe-b));position:sticky;bottom:calc(-18px - var(--safe-b));background:var(--card);border-top:1px solid var(--stroke)}
+.menu-item{display:flex;width:100%;align-items:center;gap:12px;padding:15px 4px;border-bottom:1px solid var(--stroke);font-weight:650;text-align:left}
+.menu-item:last-child{border-bottom:0}.menu-item.danger{color:var(--bad)}
+
+/* ---------- Toast ---------- */
+.toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 12px);z-index:60;
+  background:#26322c;border:1px solid var(--stroke2);border-radius:12px;padding:11px 15px;font-size:14px;font-weight:600;
+  max-width:calc(100vw - 24px);box-shadow:0 8px 30px #0008}
+.toast.err{border-color:#6b3a33;background:#3a2523}
+
+/* ---------- Connexion ---------- */
+.login{max-width:420px;margin:12vh auto 0;padding:0 20px}
+.login h1{font-size:30px;margin:6px 0 8px}
+.login p{color:var(--muted)}
+.login .btn{width:100%;margin-top:18px}
+
+/* ---------- Coulisses ---------- */
+.section-title{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 10px;font-weight:800}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}.kv dt{color:var(--muted)}.kv dd{margin:0}
+pre.log{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;background:var(--bg);border:1px solid var(--stroke);padding:10px;border-radius:9px;font:12px/1.5 ui-monospace,Consolas,monospace}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.small{font-size:13px;color:var(--muted)}
 </style>
 </head>
 <body>
-<header><a class="brand" href="../">BACKSTAGE<span style="color:var(--accent)">.</span></a><div class="row"><span class="pill">ESPACE RÉDACTION</span><button id="logout" class="secondary" hidden>Déconnexion</button></div></header>
-<main>
-<p class="eyebrow">Votre rédaction, votre décision</p>
-<h1>Articles à valider.</h1>
-<p class="muted">Lisez chaque article complet. Vous seul décidez ce qui paraît sur BACKSTAGE.</p>
-<p id="alert" role="status" aria-live="polite"></p>
-<section id="setup" class="panel" hidden>
-<h2>Configuration de la rédaction nécessaire</h2>
-<p>Le tableau de bord a été installé sur BACKSTAGE, mais la base de données privée n'est pas encore reliée. Aucun mot de passe ni article n'est exposé sur cette page.</p>
-<p class="muted">Il faut créer un projet Supabase dédié, installer le schéma SQL et renseigner la configuration publique de ce tableau de bord.</p>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<!-- Connexion -->
+<section id="login" class="login" hidden>
+  <div class="brand">BACKSTAGE<span>.</span></div>
+  <h1>Rédaction</h1>
+  <p>Connectez-vous avec le compte rédacteur.</p>
+  <form id="login-form">
+    <label class="f" for="email">E-mail</label>
+    <input class="input" type="email" id="email" autocomplete="email" required inputmode="email">
+    <label class="f" for="password">Mot de passe</label>
+    <input class="input" type="password" id="password" autocomplete="current-password" required minlength="8">
+    <button class="btn btn-primary" id="send" type="submit">Se connecter</button>
+  </form>
 </section>
-<section id="login" class="panel" hidden>
-<h2>Connexion privée</h2>
-<p>Connectez-vous avec le compte rédacteur créé dans Supabase. Aucun mot de passe n'est transmis à GitHub.</p>
-<form id="login-form">
-<label class="formfield" for="email">Adresse e-mail de rédaction</label>
-<input type="email" id="email" autocomplete="email" required placeholder="vous@votredomaine.fr">
-<label class="formfield" for="password">Mot de passe</label>
-<input type="password" id="password" autocomplete="current-password" required minlength="8" placeholder="Votre mot de passe">
-<p><button id="send" type="submit">Se connecter</button></p>
-</form>
+<section id="setup" class="login" hidden>
+  <h1>Configuration requise</h1>
+  <p>La base de données de la rédaction n'est pas encore reliée à cette page.</p>
 </section>
-<section id="workspace" hidden>
-<div class="row"><span id="counter" class="pill">0 article en attente</span><span id="radar-state" class="pill">Veille Supabase non encore activée</span><button class="secondary" id="refresh">Actualiser</button></div>
-<details id="radar-diagnostics" hidden><summary>Bilan de la dernière veille : articles retenus et pistes écartées</summary><p id="radar-diagnostic-text"></p></details>
-<details id="ai-logs-panel" class="panel">
-<summary>Journal privé des appels OpenAI <span id="ai-logs-count" class="pill">Chargement…</span></summary>
-<p class="muted">Uniquement les appels déjà effectués. Aucun token OpenAI n'est consommé pour consulter ce journal. Historique conservé 30 jours.</p>
-<div id="ai-log-list"></div>
-</details>
-<details id="sources-panel" class="panel">
-<summary>Sources officielles découvertes et suivies <span class="pill" id="sources-count">Chargement…</span></summary>
-<p class="muted">Liste évolutive : les nouvelles sources vérifiées sont ajoutées automatiquement. Le radar continue aussi de chercher sur tout le Web.</p>
-<div id="source-registry-list"></div>
-</details>
-<details class="panel"><summary>Articles historiques intégrés au site</summary><p class="muted">Retirer un ancien article du site, même s’il ne figure pas dans la liste des brouillons Supabase.</p><div id="static-articles"></div></details>
-<div id="layout"><div id="drafts"></div><article id="preview" class="panel article"><p class="empty">Sélectionnez un article pour le lire.</p></article></div>
-</section>
-</main>
+
+<!-- Application -->
+<div id="app" hidden>
+  <header class="top">
+    <div class="top-row">
+      <a class="brand" href="../" title="Voir le site">BACKSTAGE<span>.</span></a>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="refresh" title="Actualiser" aria-label="Actualiser"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button>
+      <button class="icon-btn" id="logout" title="Déconnexion" aria-label="Déconnexion"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist" id="tabs"></nav>
+  </header>
+  <div class="app">
+    <div class="layout">
+      <section class="list-pane" id="list-pane"></section>
+      <section class="reader-pane" id="reader-pane"></section>
+    </div>
+  </div>
+</div>
+<div id="layer"></div>
+
 <script type="module">
-import {createClient} from 'https://esm.sh/@supabase/supabase-js@2.58.0';
 import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from './config.js';
-const $=id=>document.getElementById(id);
-const setMessage=(message)=>{$('alert').textContent=message||''};
-const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const valid=SUPABASE_URL.startsWith('https://')&&SUPABASE_PUBLISHABLE_KEY.length>24&&!SUPABASE_URL.includes('VOTRE-PROJET');
-let client,drafts=[],selected=null,busy=false,feedbackByDraft={};
-const reasonLabels={
-  artiste:'Artiste ou groupe',ligne_editoriale:'Hors ligne éditoriale',
-  angle:'Angle ou sujet à revoir',style:'Style ou ton',
-  fiabilite:'Informations ou sources',actualite:'Actualité insuffisante',doublon:'Doublon (article déjà publié)',autre:'Autre raison'
+
+/* ============================================================
+   Outils
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const safeUrl = (u) => /^https:\/\/[^\s"'<>]+$/.test(String(u || '')) ? String(u) : '';
+const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const fmtDate = (d, opts = { day: 'numeric', month: 'short' }) => d ? new Date(d).toLocaleDateString('fr-FR', opts) : '';
+const fmtDateTime = (d) => d ? new Date(d).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+const ago = (d) => {
+  if (!d) return '';
+  const m = Math.round((Date.now() - new Date(d)) / 60000);
+  if (m < 1) return "à l'instant"; if (m < 60) return `il y a ${m} min`;
+  const h = Math.round(m / 60); if (h < 24) return `il y a ${h} h`;
+  const j = Math.round(h / 24); return j === 1 ? 'hier' : `il y a ${j} j`;
 };
-function setVisible(id,on){$(id).hidden=!on}
-function statusName(v){return({pending:'À lire',published:'En ligne',rejected:'Refusé',deleted:'Supprimé'})[v]||v}
-function imagePreview(img){if(!img||!/^https:\/\/[^\s\"'<>]+$/.test(img.url||''))return '';return '<figure style="margin:14px 0"><img loading="lazy" src="'+escapeHTML(img.url)+'" alt="'+escapeHTML(img.alt||'')+'" style="max-width:100%;max-height:360px"><figcaption>'+escapeHTML(img.caption||'')+' · Crédit : '+escapeHTML(img.credit||'')+'</figcaption></figure>'}
-function documentText(a){
-let out='<div class="eyebrow">'+escapeHTML(a.category||'ACTUALITÉ')+'</div><h2>'+escapeHTML(a.title)+'</h2><p class="deck">'+escapeHTML(a.excerpt)+'</p>'+imagePreview(a.heroImage);
-for(const p of a.body||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';
-for(const [i,group] of (a.sections||[]).entries()){out+='<h3>'+escapeHTML(group.title)+'</h3>';for(const p of group.paragraphs||[])out+='<p class="bodyparagraph">'+escapeHTML(p)+'</p>';for(const img of a.inlineImages||[])if(img.afterSection===i)out+=imagePreview(img)}
-for(const img of a.inlineImages||[])if(img.afterSection===(a.sections||[]).length)out+=imagePreview(img);
-return out;
+let toastTimer;
+function toast(msg, isError = false) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast' + (isError ? ' err' : ''); t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, isError ? 6000 : 3200);
 }
-function showPreview(){
-const row=drafts.find(x=>x.id===selected);
-if(!row){$('preview').innerHTML='<p class="empty">Sélectionnez un article pour le lire.</p>';return}
-const data=row.payload||{},a=data.article||{},fests=data.festivals||[];
-let html=documentText(a);
-if(fests.length){html+='<h3>Fiches festivals mises à jour</h3>';for(const change of fests){
- const f=change.new||{};html+='<p><strong>'+escapeHTML(f.name)+'</strong> · '+escapeHTML(f.dates)+'</p>';
- for(const day of f.lineup||[])html+='<p>'+escapeHTML(day.day)+' : '+escapeHTML((day.artists||[]).join(' · '))+'</p>';
-}}
-html+='<h3>Sources</h3><ul class="source-list">';
-for(const source of a.sources||[]){if(/^https:\/\/[^\s"'<>]+$/.test(source.url))html+='<li><a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(source.url)+'">'+escapeHTML(source.label)+'</a></li>'}
-html+='</ul>';
-if(row.status==='pending')html+='<div class="actions"><button id="edit-images" class="secondary">Gérer les images</button><form id="images-editor" hidden><p class="small-help">Utilisez uniquement des images autorisées à la publication. Crédit et texte alternatif obligatoires. Les images ne sont pas publiées avant validation de l’article.</p><label>Image de couverture (URL HTTPS)</label><input id="hero-url" type="url" placeholder="https://…"><label>Texte alternatif</label><input id="hero-alt"><label>Légende</label><input id="hero-caption"><label>Crédit / titulaire des droits</label><input id="hero-credit"><label>Droit d’utilisation confirmé</label><input type="checkbox" id="hero-rights"><h3>Illustrations dans l’article</h3><p class="small-help">Une image par ligne, format : URL | texte alternatif | légende | crédit | numéro de section (0 pour après la première).</p><textarea id="inline-image-lines" rows="5"></textarea><label><input type="checkbox" id="inline-rights"> Je confirme disposer du droit de publier les images ajoutées</label><div class="row"><button id="save-images" type="submit">Enregistrer les images</button><button id="cancel-images" type="button" class="secondary">Annuler</button></div></form></div>';
-if(row.status!=='deleted')html+='<div class="actions"><button id="delete-article" class="danger">Supprimer cet article</button></div>';
-if(row.status==='pending'){
- html+='<div class="actions"><div class="row"><button id="approve">Publier cet article</button>'+
-   '<button class="danger" id="reject">Refuser et expliquer pourquoi</button></div>'+
-   '<form id="rejection-editor" hidden>'+
-     '<strong>Votre retour éditorial</strong>'+
-     '<p class="small-help">Expliquez ce qui ne correspond pas à BACKSTAGE. Le radar pourra s\u2019en inspirer pour les prochains sujets et articles.</p>'+
-     '<label for="feedback-category">Raison principale</label>'+
-     '<select id="feedback-category" required>'+
-       Object.entries(reasonLabels).map(([value,label])=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(label)+'</option>').join('')+
-     '</select>'+
-     '<label for="feedback-reason">Ce que vous aimeriez à la place</label>'+
-     '<textarea id="feedback-reason" maxlength="1500" minlength="8" required '+
-       'placeholder="Ex. Ce groupe ne m\u2019intéresse pas. Privilégier les actualités rock plus alternatives et les annonces de festivals."></textarea>'+
-     '<label class="feedback-switch"><input id="feedback-future" type="checkbox" checked>'+
-       '<span>Tenir compte de mon avis dans les prochains articles</span></label>'+
-     '<p class="small-help">Décochez pour un refus exceptionnel. Les faits et les sources restent vérifiés indépendamment de vos préférences.</p>'+
-     '<div class="row"><button id="save-rejection" type="submit">Refuser et enregistrer mon avis</button>'+
-       '<button id="reject-no-feedback" type="button" class="secondary">Refuser sans commentaire</button>'+
-       '<button id="cancel-rejection" type="button" class="secondary">Annuler</button></div>'+
-   '</form></div>';
-}else{
- html+='<p class="pill">'+escapeHTML(statusName(row.status))+'</p>';
- const feedback=feedbackByDraft[row.id];
- if(row.status==='rejected'&&data.duplicateReview){
-   html+='<div class="private-note"><strong>Doublon détecté</strong><p>'+
-     escapeHTML('Déjà traité : '+(data.duplicateReview.existing_title||'article précédent'))+
-     '</p></div>';
- }
- if(row.status==='rejected'&&feedback){
-   html+='<div class="private-note"><strong>Votre retour enregistré</strong>'+
-     '<p>'+escapeHTML(reasonLabels[feedback.category]||'Retour éditorial')+'</p>'+
-     '<p>'+escapeHTML(feedback.reason)+'</p>'+
-     '<p class="muted">'+(feedback.apply_to_future?'Utilisé pour orienter les prochains articles':'Refus ponctuel, non réutilisé')+'</p></div>';
- }
-}
-$('preview').innerHTML=html;
-$('delete-article')?.addEventListener('click',()=>removeArticle(row));
-$('edit-images')?.addEventListener('click',()=>{const a=row.payload?.article||{};const edit=$('images-editor');edit.hidden=false;$('hero-url').value=a.heroImage?.url||'';$('hero-alt').value=a.heroImage?.alt||'';$('hero-caption').value=a.heroImage?.caption||'';$('hero-credit').value=a.heroImage?.credit||'';$('inline-image-lines').value=(a.inlineImages||[]).map(x=>[x.url,x.alt,x.caption||'',x.credit,x.afterSection].join(' | ')).join('\n');});
-$('cancel-images')?.addEventListener('click',()=>{$('images-editor').hidden=true});
-$('images-editor')?.addEventListener('submit',event=>{event.preventDefault();void saveImages(row)});
-$('approve')?.addEventListener('click',()=>decide(row,'published'));
-$('reject')?.addEventListener('click',()=>{
-  $('rejection-editor').hidden=false;
-  $('reject').hidden=true;
-  $('feedback-reason').focus();
-});
-$('cancel-rejection')?.addEventListener('click',()=>{
-  $('rejection-editor').hidden=true;
-  $('reject').hidden=false;
-});
-$('feedback-category')?.addEventListener('change',()=>{
- if($('feedback-category').value==='doublon' && !$('feedback-reason').value.trim()){
-  $('feedback-reason').value="Cette annonce a déjà fait l'objet d'un article sur BACKSTAGE.";
-  $('feedback-future').checked=true;
- }
-});
-$('reject-no-feedback')?.addEventListener('click',()=>decide(row,'rejected'));
-$('rejection-editor')?.addEventListener('submit',event=>{
-  event.preventDefault();
-  const category=$('feedback-category').value;
-  const reason=$('feedback-reason').value.trim();
-  if(reason.length<8){setMessage('Précisez le motif de refus (8 caractères minimum).');return}
-  void rejectWithFeedback(row,category,reason,$('feedback-future').checked);
-});
-}
-function showList(){
-$('counter').textContent=drafts.filter(x=>x.status==='pending').length+' article(s) à valider';
-$('drafts').replaceChildren();
-for(const d of drafts){const b=document.createElement('button');b.className='draft'+(selected===d.id?' active':'');b.innerHTML='<span class="pill">'+escapeHTML(statusName(d.status))+'</span><strong>'+escapeHTML(d.title)+'</strong><span class="muted">'+escapeHTML(new Date(d.created_at).toLocaleDateString('fr-FR'))+'</span>';b.addEventListener('click',()=>{selected=d.id;showList();showPreview()});$('drafts').append(b)}
-if(!drafts.length)$('drafts').innerHTML='<p class="empty">Aucun article en attente. Le radar musical continue sa veille.</p>';
-showPreview();
-}
-async function loadSources(){
-const container=$('source-registry-list');
-container.replaceChildren();
-const {data:rows,error}=await client.from('editorial_sources')
-  .select('host,name,site_url,origin,status,verified_articles,last_verified_at,last_checked_at')
-  .order('last_verified_at',{ascending:false,nullsFirst:false}).limit(100);
-if(error){
-  $('sources-count').textContent='Non configuré';
-  const p=document.createElement('p');
-  p.textContent='Installer la migration-dynamic-sources.sql pour activer les sources évolutives.';
-  container.append(p);
-  return;
-}
-$('sources-count').textContent=(rows||[]).length+' source(s) affichée(s)';
-if(!rows?.length){
-  const p=document.createElement('p');
-  p.textContent='Aucune source enregistrée. La recherche Web ouverte fonctionne même sans cette liste.';
-  container.append(p);
-  return;
-}
-for(const src of rows){
-  const div=document.createElement('div');
-  div.className='source-registry-item';
-  const name=document.createElement('strong');
-  name.textContent=src.name;
-  div.append(name);
-  const meta=document.createElement('p');
-  meta.textContent=(src.origin==='discovered'?'Découverte automatiquement':'Source de départ')+
-    ' · '+(src.status==='paused'?'En pause':'Suivie')+
-    ' · '+src.verified_articles+' article(s) vérifié(s)';
-  div.append(meta);
-  const link=document.createElement('a');
-  link.href=src.site_url;
-  link.target='_blank';
-  link.rel='noopener noreferrer';
-  link.textContent=src.host;
-  div.append(link);
-  container.append(div);
-}
-}
-async function loadAiLogs(){
-const container=$('ai-log-list');
-container.replaceChildren();
-const {data:logs,error}=await client.from('editorial_ai_logs')
- .select('id,slot,stage,status,model,request_text,response_text,error_detail,openai_response_id,input_tokens,output_tokens,reasoning_tokens,web_search_calls,duration_ms,created_at')
- .order('created_at',{ascending:false}).limit(30);
-if(error){
-  $('ai-logs-count').textContent='Non configuré';
-  const p=document.createElement('p');
-  p.textContent='Journal indisponible : installer migration-ai-logs.sql dans Supabase puis redéployer backstage-radar.';
-  container.append(p);
-  return;
-}
-$('ai-logs-count').textContent=(logs||[]).length+' appel(s) enregistré(s)';
-if(!logs?.length){
-  const p=document.createElement('p');
-  p.textContent='Aucun appel enregistré pour le moment. Le journal démarre lors du prochain passage du radar après son déploiement.';
-  container.append(p);
-  return;
-}
-for(const entry of logs){
-  const box=document.createElement('details');
-  box.className='ai-log';
-  const heading=document.createElement('summary');
-  const date=new Date(entry.created_at).toLocaleString('fr-FR');
-  const phase=entry.stage==='decouverte'?'Recherche Web':'Rédaction';
-  const tokens=(entry.input_tokens||0)+(entry.output_tokens||0);
-  heading.textContent=date+' · '+phase+' · '+(entry.status==='completed'?'Terminé':'Erreur')+
-    ' · '+tokens.toLocaleString('fr-FR')+' tokens';
-  box.append(heading);
-  const metadata=document.createElement('p');
-  metadata.textContent='Créneau : '+entry.slot+' · Modèle : '+entry.model+
-    ' · Entrée : '+entry.input_tokens+' · Sortie : '+entry.output_tokens+
-    ' · Raisonnement inclus dans la sortie : '+entry.reasoning_tokens+
-    ' · Recherches Web : '+entry.web_search_calls+
-    ' · Durée : '+(entry.duration_ms/1000).toFixed(1)+' s';
-  box.append(metadata);
-  for(const [title,content] of [
-    ['Requête réellement envoyée à OpenAI',entry.request_text],
-    ['Réponse reçue',entry.response_text],
-    ['Erreur éventuelle',entry.error_detail]
-  ]){
-    if(!content)continue;
-    const label=document.createElement('div');
-    label.className='ai-label';
-    label.textContent=title;
-    const pre=document.createElement('pre');
-    pre.textContent=content;
-    box.append(label,pre);
-  }
-  container.append(box);
-}
-}
-async function loadStaticArticles(){
- const container=$('static-articles');container.replaceChildren();
- try{
-  const [catalogueResponse,hiddenResponse]=await Promise.all([
-   fetch('../historical-articles.json',{cache:'no-store'}),
-   client.rpc('list_hidden_article_slugs')
+const wordCount = (a) => [...(a.body || []), ...(a.sections || []).flatMap((s) => s.paragraphs || [])].join(' ').split(/\s+/).filter(Boolean).length;
+
+const REASONS = {
+  doublon: 'Doublon', actualite: 'Pas assez d’actualité', ligne_editoriale: 'Hors ligne éditoriale',
+  artiste: 'Artiste peu intéressant', angle: 'Angle à revoir', style: 'Style ou ton',
+  fiabilite: 'Infos ou sources douteuses', autre: 'Autre',
+};
+const WARNING_TEXT = (w) => {
+  const s = String(w);
+  if (s.startsWith('cliche:')) return 'Formule toute faite : « ' + s.slice(7).trim() + ' »';
+  if (s.startsWith('annees_non_sourcees')) return 'Année(s) absente(s) des sources : ' + s.split(':')[1];
+  if (s.startsWith('chiffres_non_sources')) return 'Chiffre(s) absent(s) des sources : ' + s.split(':')[1];
+  if (s.startsWith('plus_court_que_le_format')) return 'Plus court que le format visé ' + s.replace(/^\D+/, '(');
+  if (s.startsWith('plus_long_que_le_format')) return 'Plus long que le format visé ' + s.replace(/^\D+/, '(');
+  return ({ citation_a_verifier: 'Citation à vérifier', conclusion_formule: 'Conclusion un peu convenue',
+    titre_long: 'Titre long', chapo_repete_le_titre: 'Le chapô répète le titre' })[s] || s;
+};
+const EVIDENCE_TEXT = { jsonld: 'métadonnées de la page', meta: 'métadonnées de la page', time: 'date affichée sur la page',
+  sous_le_titre: 'date sous le titre', marqueur_publication: 'mention « publié le »', url: 'adresse de la page',
+  sommaire_officiel: 'sommaire officiel du site', presse: 'article de presse', validation_humaine: 'votre validation' };
+const LEAD_REASON = { date_publication_non_prouvee: 'Date de l’annonce introuvable', date_publication_incertaine: 'Date de l’annonce incertaine',
+  dates_contradictoires: 'Dates contradictoires sur la page', date_publication_future: 'Date située dans le futur',
+  evenement_non_retrouve: 'Festival non retrouvé sur la page', edition_non_retrouvee: 'Édition non retrouvée sur la page',
+  contenu_illisible: 'Page illisible automatiquement', annonce_trop_ancienne: 'Annonce trop ancienne' };
+
+/* ============================================================
+   État
+   ============================================================ */
+const state = {
+  tab: 'pending', selected: null, drafts: [], leads: [], feedback: {}, run: null, search: '',
+  limits: { published: 30, rejected: 30 }, busy: false,
+};
+const TABS = [
+  { id: 'pending', label: 'À valider' },
+  { id: 'leads', label: 'Pistes' },
+  { id: 'published', label: 'Publiés' },
+  { id: 'rejected', label: 'Refusés' },
+  { id: 'system', label: 'Coulisses' },
+];
+let client;
+
+/* ============================================================
+   Données
+   ============================================================ */
+async function loadAll() {
+  const [drafts, feedback, run, leads] = await Promise.all([
+    client.from('editorial_drafts').select('id,title,excerpt,status,created_at,decided_at,published_at,payload,quality')
+      .in('status', ['pending', 'published', 'rejected']).order('created_at', { ascending: false }).limit(200),
+    client.from('editorial_feedback').select('draft_id,category,reason,apply_to_future').order('created_at', { ascending: false }).limit(200),
+    client.from('editorial_radar_runs').select('slot,status,detail,started_at').order('started_at', { ascending: false }).limit(1),
+    client.from('editorial_leads').select('id,title,status,official_url,event_name,edition,kind,artists,publication_date,date_evidence_type,date_evidence_url,rejection_reason,verification,why_now,created_at,updated_at')
+      .eq('shadow', false).in('status', ['needs_review', 'write_failed']).order('created_at', { ascending: false }).limit(50),
   ]);
-  if(!catalogueResponse.ok)throw Error('Catalogue indisponible (HTTP '+catalogueResponse.status+')');
-  if(hiddenResponse.error)throw hiddenResponse.error;
-  const catalogue=await catalogueResponse.json();
-  if(!Array.isArray(catalogue))throw Error('Format du catalogue incorrect');
-  const hidden=new Set((hiddenResponse.data||[]).map(x=>x.slug));
-  const items=catalogue.filter(x=>typeof x.slug==='string' && typeof x.title==='string' && !hidden.has(x.slug));
-  for(const article of items){
-   const line=document.createElement('div');line.className='row';
-   line.style.cssText='justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--stroke)';
-   const title=document.createElement('span');title.textContent=article.title;
-   const button=document.createElement('button');button.className='danger';
-   button.textContent='Supprimer';button.type='button';
-   button.addEventListener('click',async()=>{
-    if(busy||!confirm('Retirer définitivement du site « '+article.title+' » ?'))return;
-    busy=true;button.disabled=true;
-    try{
-     const {error}=await client.rpc('remove_editorial_article',{p_slug:article.slug});
-     if(error)throw error;
-     setMessage('Article historique retiré du site.');
-     await load();
-    }catch(e){setMessage('Suppression impossible : '+e.message)}
-    finally{busy=false;button.disabled=false}
-   });
-   line.append(title,button);container.append(line);
+  if (drafts.error) {
+    // Base sans la colonne « quality » (avant la v2) : on relit sans elle.
+    const retry = await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload')
+      .in('status', ['pending', 'published', 'rejected']).order('created_at', { ascending: false }).limit(200);
+    if (retry.error) { toast('Lecture impossible : ' + retry.error.message, true); return; }
+    state.drafts = retry.data || [];
+  } else state.drafts = drafts.data || [];
+  state.feedback = feedback.error ? {} : Object.fromEntries((feedback.data || []).map((f) => [f.draft_id, f]));
+  state.run = run.error ? null : (run.data || [])[0] || null;
+  state.leads = leads.error ? [] : leads.data || [];
+  render();
+}
+const byStatus = (s) => state.drafts.filter((d) => d.status === s);
+const current = () => state.drafts.find((d) => d.id === state.selected) || null;
+const currentLead = () => state.leads.find((l) => 'lead:' + l.id === state.selected) || null;
+
+/* ============================================================
+   Navigation (le bouton « retour » du téléphone fonctionne)
+   ============================================================ */
+function go(tab, selected = null, push = true) {
+  state.tab = tab; state.selected = selected;
+  const hash = '#/' + tab + (selected ? '/' + encodeURIComponent(selected) : '');
+  if (push && location.hash !== hash) history.pushState(null, '', hash);
+  render();
+  if (selected && window.innerWidth < 900) window.scrollTo(0, 0);
+}
+function readHash() {
+  const [, tab, sel] = location.hash.split('/');
+  state.tab = TABS.some((t) => t.id === tab) ? tab : 'pending';
+  state.selected = sel ? decodeURIComponent(sel) : null;
+}
+window.addEventListener('popstate', () => { readHash(); closeLayer(); render(); });
+
+/* ============================================================
+   Rendu
+   ============================================================ */
+function render() {
+  renderTabs();
+  const reading = !!state.selected && state.tab !== 'system';
+  document.body.classList.toggle('reading', reading);
+  renderList();
+  renderReader();
+}
+function renderTabs() {
+  const counts = { pending: byStatus('pending').length, leads: state.leads.length };
+  $('tabs').innerHTML = TABS.map((t) => {
+    const n = counts[t.id];
+    const badge = n ? `<span class="badge${t.id === 'pending' ? ' hot' : ''}">${n}</span>` : '';
+    return `<button class="tab" role="tab" aria-selected="${state.tab === t.id}" data-tab="${t.id}">${t.label}${badge}</button>`;
+  }).join('');
+  for (const b of $('tabs').querySelectorAll('[data-tab]')) b.onclick = () => go(b.dataset.tab);
+}
+
+function radarLine() {
+  const r = state.run;
+  if (!r) return '<div class="status-line"><span class="dot"></span>Aucune veille enregistrée</div>';
+  const cls = r.status === 'completed' ? 'ok' : r.status === 'running' ? 'run' : 'bad';
+  const label = r.status === 'completed' ? 'Dernière veille' : r.status === 'running' ? 'Veille en cours' : 'Veille en échec';
+  return `<div class="status-line" title="${esc(r.detail)}"><span class="dot ${cls}"></span>${label} · ${esc(ago(r.started_at))}</div>`;
+}
+
+function draftCard(d) {
+  const a = d.payload?.article || {};
+  const warn = (d.quality?.warnings || []).length;
+  const fb = state.feedback[d.id];
+  const chips = [];
+  if (a.category) chips.push(`<span class="chip">${esc(a.category)}</span>`);
+  if (d.status === 'pending' && warn) chips.push(`<span class="chip warn">${warn} point${warn > 1 ? 's' : ''} à vérifier</span>`);
+  if (d.status === 'rejected' && fb) chips.push(`<span class="chip bad">${esc(REASONS[fb.category] || 'Refusé')}</span>`);
+  if (d.status === 'published') chips.push('<span class="chip ok">En ligne</span>');
+  const date = d.status === 'published' ? (d.published_at || d.decided_at || d.created_at) : d.created_at;
+  return `<button class="card${state.selected === d.id ? ' active' : ''}" data-id="${esc(d.id)}">
+    <div class="card-meta">${chips.join('')}<span>${esc(ago(date))}</span></div>
+    <h3>${esc(d.title)}</h3><p>${esc(d.excerpt || a.excerpt || '')}</p></button>`;
+}
+function leadCard(l) {
+  const reason = LEAD_REASON[l.rejection_reason] || (l.status === 'write_failed' ? 'Rédaction échouée' : l.rejection_reason || 'À examiner');
+  return `<button class="card${state.selected === 'lead:' + l.id ? ' active' : ''}" data-id="lead:${esc(l.id)}">
+    <div class="card-meta"><span class="chip warn">${esc(reason)}</span><span>${esc(host(l.official_url))}</span><span>${esc(ago(l.created_at))}</span></div>
+    <h3>${esc(l.title)}</h3>${l.why_now ? `<p>${esc(l.why_now)}</p>` : ''}</button>`;
+}
+
+function renderList() {
+  const pane = $('list-pane');
+  if (state.tab === 'system') { pane.innerHTML = radarLine() + '<div id="system"></div>'; renderSystem(); return; }
+  let html = radarLine(), items = [];
+  if (state.tab === 'leads') {
+    items = state.leads;
+    html += '<p class="small" style="margin:0 0 12px">Annonces probablement réelles que le système n’a pas pu prouver seul. Validez-les pour qu’elles soient rédigées, ou écartez-les.</p>';
+    html += items.length ? '<div class="cards">' + items.map(leadCard).join('') + '</div>'
+      : '<div class="empty"><strong>Rien à examiner</strong>Toutes les annonces trouvées ont été vérifiées automatiquement.</div>';
+  } else {
+    items = byStatus(state.tab);
+    if (state.tab !== 'pending') {
+      html += `<input class="search" id="search" type="search" placeholder="Rechercher un titre…" value="${esc(state.search)}">`;
+      const q = state.search.trim().toLowerCase();
+      if (q) items = items.filter((d) => (d.title || '').toLowerCase().includes(q));
+    }
+    const limit = state.limits[state.tab] || Infinity;
+    const shown = items.slice(0, limit);
+    if (!items.length) {
+      html += state.tab === 'pending'
+        ? '<div class="empty"><strong>Tout est traité 🎉</strong>Aucun article en attente. La veille continue à 7 h et 18 h.</div>'
+        : '<div class="empty">Aucun article.</div>';
+    } else {
+      html += '<div class="cards">' + shown.map(draftCard).join('') + '</div>';
+      if (items.length > shown.length) html += `<button class="more" id="more">Afficher plus (${items.length - shown.length})</button>`;
+    }
   }
-  if(!items.length)container.textContent='Aucun article historique actif.';
- }catch(e){container.textContent='Impossible de charger les anciens articles : '+e.message}
+  pane.innerHTML = html;
+  for (const c of pane.querySelectorAll('[data-id]')) c.onclick = () => go(state.tab, c.dataset.id);
+  const s = $('search'); if (s) s.oninput = () => { state.search = s.value; const pos = s.selectionStart; renderList(); const n = $('search'); n.focus(); n.setSelectionRange(pos, pos); };
+  const m = $('more'); if (m) m.onclick = () => { state.limits[state.tab] += 30; renderList(); };
 }
-async function load(){
-const {data,error}=await client.from('editorial_drafts').select('id,title,excerpt,status,created_at,payload').order('created_at',{ascending:false}).limit(60);
-if(error){setMessage('Lecture impossible : '+error.message);return}
-drafts=data||[];
-const feedbackResult=await client.from('editorial_feedback')
-  .select('draft_id,category,reason,apply_to_future').order('created_at',{ascending:false}).limit(100);
-if(feedbackResult.error){
-  feedbackByDraft={};
-  setMessage('Mémoire éditoriale non encore installée : exécutez migration-editorial-feedback.sql dans Supabase.');
-}else{
-  feedbackByDraft=Object.fromEntries((feedbackResult.data||[]).map(f=>[f.draft_id,f]));
+
+/* ---------- Lecteur d'article ---------- */
+function figure(img) {
+  const u = safeUrl(img?.url); if (!u) return '';
+  return `<figure><img loading="lazy" src="${esc(u)}" alt="${esc(img.alt)}"><figcaption>${esc(img.caption || '')}${img.credit ? ' · ' + esc(img.credit) : ''}</figcaption></figure>`;
 }
-const radar=await client.from('editorial_radar_runs').select('status,detail,started_at')
-  .order('started_at',{ascending:false}).limit(1);
-if(!radar.error && radar.data?.length){
-  const run=radar.data[0];
-  const date=new Date(run.started_at).toLocaleString('fr-FR');
-  $('radar-state').textContent='Dernière veille : '+date+' ('+
-    (run.status==='completed'?'terminée':run.status==='running'?'en cours':'échec')+')';
-  $('radar-state').title=run.detail||'';
-  const explanation=String(run.detail||'').trim();
-  $('radar-diagnostics').hidden=!explanation;
-  $('radar-diagnostic-text').textContent=explanation;
-}else{
-  $('radar-state').textContent='Veille Supabase non encore activée';
-  $('radar-diagnostics').hidden=true;
-}
-if(!selected||!drafts.some(x=>x.id===selected))selected=drafts[0]?.id||null;
-showList();
-await Promise.all([loadAiLogs(),loadSources(),loadStaticArticles()]);
-}
-async function saveImages(row){
- if(busy||row.status!=='pending')return;
- const url=$('hero-url').value.trim(),alt=$('hero-alt').value.trim(),caption=$('hero-caption').value.trim(),credit=$('hero-credit').value.trim();
- if(url&&(!/^https:\/\/[^\s"'<>]+$/.test(url)||!alt||!credit||!$('hero-rights').checked)){setMessage('Couverture : URL HTTPS, texte alternatif, crédit et autorisation nécessaires.');return}
- const lines=$('inline-image-lines').value.split('\n').map(s=>s.trim()).filter(Boolean);
- if(lines.length>4){setMessage('Quatre illustrations maximum.');return}
- const inlineImages=[];
- for(const line of lines){const parts=line.split('|').map(x=>x.trim());const [imageUrl,imageAlt,imageCaption,imageCredit,index]=parts;
-  const position=Number(index);
-  if(parts.length!==5||!/^https:\/\/[^\s"'<>]+$/.test(imageUrl)||!imageAlt||!imageCredit||!Number.isInteger(position)||position<0||position>(row.payload?.article?.sections||[]).length){setMessage('Ligne incorrecte : URL | alt | légende | crédit | numéro de section.');return}
-  inlineImages.push({url:imageUrl,alt:imageAlt,caption:imageCaption,credit:imageCredit,afterSection:position});
- }
- if(inlineImages.length&&!$('inline-rights').checked){setMessage('Confirme les droits des illustrations.');return}
- const article={...row.payload.article,heroImage:url?{url,alt,caption,credit}:null,inlineImages};
- const payload={...row.payload,article};
- busy=true;setMessage('Enregistrement des images…');
- try{const {error}=await client.rpc('update_editorial_draft_images',{p_draft_id:row.id,p_hero:article.heroImage,p_inline:inlineImages});if(error)throw error;setMessage('Images enregistrées dans le brouillon.');await load()}
- catch(err){setMessage('Enregistrement impossible : '+err.message)}
- finally{busy=false}
-}
-async function removeArticle(row){
- if(busy || row.status==='deleted')return;
- if(!confirm('Supprimer « '+row.title+' » ? Cet article sera retiré du site et de la validation. Cette action ne peut pas être annulée depuis l’interface.'))return;
- busy=true;setMessage('Suppression de l’article…');
- try{
-  const {error}=await client.rpc('remove_editorial_article',{p_draft_id:row.id});
-  if(error)throw error;
-  setMessage('Article supprimé. Il ne sera plus proposé à la validation ni affiché en ligne.');
-  await load();
- }catch(error){setMessage('Suppression impossible : '+error.message);showPreview()}
- finally{busy=false}
-}
-async function decide(row,status){
-if(busy||row.status!=='pending')return;
-const question=status==='published'?'Publier immédiatement cet article sur BACKSTAGE ?':'Refuser cet article sans le publier ?';
-if(!confirm(question))return;
-busy=true;$('approve').disabled=true;$('reject').disabled=true;setMessage('Enregistrement de votre décision…');
-try{
-const {error}=await client.rpc('decide_editorial_draft',{p_draft_id:row.id,p_decision:status});
-if(error)throw error;
-setMessage(status==='published'?'Article publié : il sera visible sur BACKSTAGE dès le prochain chargement de la page.':'Article refusé : il ne sera pas publié.');
-await load();
-}catch(err){setMessage('Décision non enregistrée : '+err.message);showPreview()}
-finally{busy=false}
-}
-async function rejectWithFeedback(row,category,reason,applyFuture){
-if(busy||row.status!=='pending')return;
-if(!confirm('Refuser cet article et enregistrer votre retour éditorial ?'))return;
-busy=true;
-$('approve').disabled=true;
-$('save-rejection').disabled=true;
-setMessage('Enregistrement du refus et de votre avis…');
-try{
-  const {error}=await client.rpc('reject_editorial_draft_with_feedback',{
-    p_draft_id:row.id,p_category:category,p_reason:reason,p_apply_to_future:applyFuture
+function articleHTML(a) {
+  let h = `<div class="kicker">${esc(a.category || 'Actualité')}</div><h1>${esc(a.title)}</h1><p class="deck">${esc(a.excerpt)}</p>${figure(a.heroImage)}<div class="body">`;
+  for (const p of a.body || []) h += `<p>${esc(p)}</p>`;
+  (a.sections || []).forEach((s, i) => {
+    h += `<h2>${esc(s.title)}</h2>` + (s.paragraphs || []).map((p) => `<p>${esc(p)}</p>`).join('');
+    for (const img of a.inlineImages || []) if (img.afterSection === i) h += figure(img);
   });
-  if(error)throw error;
-  setMessage(applyFuture
-    ? 'Article refusé. Votre avis guidera les prochaines recherches et rédactions.'
-    : 'Article refusé. Ce retour restera ponctuel et ne sera pas réutilisé.');
-  await load();
-}catch(error){
-  setMessage('Refus non enregistré : '+error.message);
-  showPreview();
-}finally{busy=false}
+  for (const img of a.inlineImages || []) if (img.afterSection === (a.sections || []).length) h += figure(img);
+  return h + '</div>';
 }
-async function init(){
-if(!valid){setVisible('setup',true);return}
-client=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-$('login-form').addEventListener('submit',async(e)=>{
- e.preventDefault();
- const email=$('email').value.trim();
- const password=$('password').value;
- if(!email||!password)return setMessage('Renseignez votre e-mail et votre mot de passe.');
- $('send').disabled=true;
- try{
-   const {error}=await client.auth.signInWithPassword({email,password});
-   if(error)throw error;
-   $('password').value='';
-   setMessage('');
- }catch(error){
-   setMessage('Connexion impossible : '+error.message);
- }finally{
-   $('send').disabled=false;
- }
-});
-$('logout').addEventListener('click',async()=>{await client.auth.signOut();location.reload()});
-$('refresh').addEventListener('click',load);
-const {data:{session}}=await client.auth.getSession();
-setVisible('login',!session);setVisible('workspace',!!session);setVisible('logout',!!session);
-if(session)await load();
-client.auth.onAuthStateChange((_event,current)=>{
- setVisible('login',!current);setVisible('workspace',!!current);setVisible('logout',!!current);
- if(current)void load();
-});
+function proofBox(d) {
+  const v = d.quality?.verification;
+  const a = d.payload?.article || {};
+  let h = '';
+  if (v?.publication_date) {
+    h += `<div class="box proof"><h4>✓ Annonce vérifiée</h4><p>Publiée le <strong>${esc(fmtDate(v.publication_date, { day: 'numeric', month: 'long', year: 'numeric' }))}</strong>`;
+    if (v.date_evidence_type) h += ` — d’après ${esc(EVIDENCE_TEXT[v.date_evidence_type] || v.date_evidence_type)}`;
+    h += safeUrl(v.date_evidence_url) ? ` (<a href="${esc(v.date_evidence_url)}" target="_blank" rel="noopener">${esc(host(v.date_evidence_url))}</a>)` : '';
+    h += '.</p>';
+    if (v.story_verdict?.verdict === 'update') h += `<p>Mise à jour de « ${esc(v.story_verdict.of)} ».</p>`;
+    h += '</div>';
+  }
+  const w = d.quality?.warnings || [];
+  if (w.length) h += `<div class="box warn"><h4>À vérifier avant publication</h4><ul>${w.map((x) => `<li>${esc(WARNING_TEXT(x))}</li>`).join('')}</ul></div>`;
+  const src = (a.sources || []).filter((s) => safeUrl(s.url));
+  if (src.length) h += `<div class="box sources"><h4>Sources</h4><ul>${src.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">${esc(s.label || host(s.url))}</a> <span class="small">${esc(host(s.url))}</span></li>`).join('')}</ul></div>`;
+  return h;
 }
-init().catch(e=>setMessage('Erreur de connexion : '+e.message));
+function renderReader() {
+  const pane = $('reader-pane');
+  const bar = $('actionbar'); if (bar) bar.remove();
+  if (state.tab === 'system') { pane.innerHTML = ''; return; }
+  const lead = currentLead();
+  if (lead) return renderLead(pane, lead);
+  const d = current();
+  if (!d) {
+    pane.innerHTML = window.innerWidth >= 900 ? '<div class="empty" style="margin-top:20vh">Sélectionnez un article pour le lire.</div>' : '';
+    return;
+  }
+  const a = d.payload?.article || {};
+  const words = wordCount(a);
+  const fests = d.payload?.festivals || [];
+  let h = `<div class="reader"><button class="back-btn" id="back">← Retour</button>
+    <div class="meta-line"><span class="chip">${esc(fmtDateTime(d.created_at))}</span><span class="chip">${words} mots · ${Math.max(1, Math.round(words / 210))} min</span>
+    ${d.status === 'published' ? '<span class="chip ok">En ligne</span>' : d.status === 'rejected' ? '<span class="chip bad">Refusé</span>' : '<span class="chip accent">À valider</span>'}</div>`;
+  if (d.status === 'pending') h += proofBox(d).split('<div class="box sources">')[0];
+  h += articleHTML(a);
+  if (fests.length) {
+    h += '<div class="box"><h4>Fiches festival mises à jour</h4>';
+    for (const c of fests) { const f = c.new || {}; h += `<p><strong>${esc(f.name)}</strong> · ${esc(f.dates)}</p>` + (f.lineup || []).map((x) => `<p class="small">${esc(x.day)} : ${esc((x.artists || []).join(' · '))}</p>`).join(''); }
+    h += '</div>';
+  }
+  const srcIdx = proofBox(d).indexOf('<div class="box sources">');
+  if (srcIdx >= 0) h += proofBox(d).slice(srcIdx);
+  if (d.status !== 'pending') h += proofBox(d).split('<div class="box sources">')[0];
+  const fb = state.feedback[d.id];
+  if (d.status === 'rejected' && fb) h += `<div class="box"><h4>Votre retour</h4><p><strong>${esc(REASONS[fb.category] || fb.category)}</strong></p><p>${esc(fb.reason)}</p><p class="small">${fb.apply_to_future ? 'Pris en compte pour les prochains articles' : 'Refus ponctuel'}</p></div>`;
+  if (d.status === 'rejected' && d.payload?.duplicateReview) h += `<div class="box"><h4>Doublon détecté</h4><p>Déjà traité : ${esc(d.payload.duplicateReview.existing_title || 'article précédent')}</p></div>`;
+  h += '</div>';
+  pane.innerHTML = h;
+  $('back').onclick = () => history.length > 1 ? history.back() : go(state.tab);
+
+  // Barre d'actions toujours visible : plus besoin de descendre en bas de l'article.
+  const ab = document.createElement('div'); ab.className = 'actionbar'; ab.id = 'actionbar';
+  if (d.status === 'pending') {
+    ab.innerHTML = `<button class="btn btn-more" id="more-actions" aria-label="Plus d’actions">⋯</button>
+      <button class="btn btn-ghost" id="reject">Refuser</button>
+      <button class="btn btn-primary" id="approve">Publier</button>`;
+  } else {
+    ab.innerHTML = `<span class="grow small">${d.status === 'published' ? 'Publié ' + esc(ago(d.published_at || d.decided_at || d.created_at)) : 'Refusé'}</span>
+      ${d.status === 'published' ? `<a class="btn btn-ghost" style="flex:none" href="../#${esc(a.slug || '')}" target="_blank" rel="noopener">Voir sur le site</a>` : ''}
+      <button class="btn btn-danger" style="flex:none" id="delete">Supprimer</button>`;
+  }
+  pane.append(ab);
+  $('approve') && armTwoStep($('approve'), 'Confirmer la publication', () => decide(d, 'published'));
+  $('reject') && ($('reject').onclick = () => openReject(d));
+  $('more-actions') && ($('more-actions').onclick = () => openMore(d));
+  $('delete') && armTwoStep($('delete'), 'Confirmer', () => removeDraft(d));
+}
+
+/* ---------- Pistes à examiner ---------- */
+function renderLead(pane, l) {
+  const v = l.verification || {};
+  const checks = v.checks || {};
+  let h = `<div class="reader"><button class="back-btn" id="back">← Retour</button>
+    <div class="meta-line"><span class="chip warn">${esc(LEAD_REASON[l.rejection_reason] || l.rejection_reason || 'À examiner')}</span><span class="chip">${esc(ago(l.created_at))}</span></div>
+    <div class="kicker">Piste à examiner</div><h1>${esc(l.title)}</h1>
+    ${l.why_now ? `<p class="deck">${esc(l.why_now)}</p>` : ''}
+    <div class="box"><h4>Ce que le système a vérifié</h4><dl class="kv">
+      <dt>Source</dt><dd>${safeUrl(l.official_url) ? `<a href="${esc(l.official_url)}" target="_blank" rel="noopener">${esc(host(l.official_url))}</a>` : '—'}</dd>
+      ${l.event_name ? `<dt>Événement</dt><dd>${esc(l.event_name)} ${checks.event_found === true ? '✓' : checks.event_found === false ? '✗' : ''}</dd>` : ''}
+      ${l.edition ? `<dt>Édition</dt><dd>${esc(l.edition)} ${checks.edition_found === true ? '✓' : checks.edition_found === false ? '✗' : ''}</dd>` : ''}
+      ${(l.artists || []).length ? `<dt>Artistes</dt><dd>${esc(l.artists.join(', '))}</dd>` : ''}
+      <dt>Date trouvée</dt><dd>${l.publication_date ? esc(fmtDate(l.publication_date, { day: 'numeric', month: 'long', year: 'numeric' })) + (l.date_evidence_type ? ' · ' + esc(EVIDENCE_TEXT[l.date_evidence_type] || l.date_evidence_type) : '') : 'aucune'}</dd>
+    </dl></div>
+    <label class="f" for="lead-date">Date de l’annonce (si vous la connaissez)</label>
+    <input class="input" type="date" id="lead-date" value="${esc(l.publication_date || '')}" style="max-width:220px">
+    <p class="small">Valider envoie la piste en rédaction : l’article arrivera dans « À valider » d’ici 30 minutes.</p></div>`;
+  pane.innerHTML = h;
+  $('back').onclick = () => history.length > 1 ? history.back() : go(state.tab);
+  const ab = document.createElement('div'); ab.className = 'actionbar'; ab.id = 'actionbar';
+  ab.innerHTML = `<button class="btn btn-ghost" id="dismiss">Écarter</button><button class="btn btn-primary" id="validate">Valider la piste</button>`;
+  pane.append(ab);
+  $('validate').onclick = () => reviewLead(l, 'verified', $('lead-date').value || null);
+  armTwoStep($('dismiss'), 'Confirmer', () => reviewLead(l, 'dismissed'));
+}
+
+/* ---------- Coulisses ---------- */
+async function renderSystem() {
+  const box = $('system'); if (!box) return;
+  const r = state.run;
+  box.innerHTML = `<div class="section-title">Dernière veille</div>
+    <div class="box"><dl class="kv"><dt>Créneau</dt><dd>${esc(r?.slot || '—')}</dd><dt>Début</dt><dd>${esc(fmtDateTime(r?.started_at))}</dd>
+    <dt>Résultat</dt><dd>${esc(r?.detail || '—')}</dd></dl></div>
+    <div class="section-title">Consommation OpenAI (7 jours)</div><div class="box" id="usage">Chargement…</div>
+    <details class="box"><summary>Journal des appels OpenAI</summary><div id="logs">Chargement…</div></details>
+    <details class="box"><summary>Sources suivies</summary><div id="sources">Chargement…</div></details>
+    <details class="box"><summary>Articles historiques du site</summary><div id="historical">Chargement…</div></details>`;
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  const [logs, week, sources] = await Promise.all([
+    client.from('editorial_ai_logs').select('slot,stage,status,model,input_tokens,output_tokens,web_search_calls,duration_ms,created_at,error_detail,response_text').order('created_at', { ascending: false }).limit(25),
+    client.from('editorial_ai_logs').select('stage,input_tokens,output_tokens,web_search_calls').gte('created_at', since).limit(1000),
+    client.from('editorial_sources').select('host,name,site_url,origin,status,verified_articles').order('verified_articles', { ascending: false }).limit(100),
+  ]);
+  if (!$('usage')) return;
+  if (!week.error) {
+    const by = {}; for (const x of week.data || []) { const k = x.stage; by[k] ??= { n: 0, tok: 0, web: 0 }; by[k].n++; by[k].tok += (x.input_tokens || 0) + (x.output_tokens || 0); by[k].web += x.web_search_calls || 0; }
+    const lab = { decouverte: 'Recherches', veille_festivals: 'Veille festivals', redaction: 'Rédactions' };
+    $('usage').innerHTML = Object.keys(by).length ? '<dl class="kv">' + Object.entries(by).map(([k, v]) => `<dt>${esc(lab[k] || k)}</dt><dd>${v.n} appel(s) · ${v.web} recherche(s) Web · ${v.tok.toLocaleString('fr-FR')} tokens</dd>`).join('') + '</dl>' : 'Aucun appel cette semaine.';
+  } else $('usage').textContent = 'Indisponible.';
+  $('logs').innerHTML = logs.error ? 'Indisponible.' : (logs.data || []).map((x) => `<details class="box" style="margin:8px 0"><summary>${esc(fmtDateTime(x.created_at))} · ${esc({ decouverte: 'Recherche', veille_festivals: 'Veille festivals', redaction: 'Rédaction' }[x.stage] || x.stage)} · ${x.status === 'completed' ? 'OK' : 'Erreur'}</summary>
+    <p class="small">${esc(x.model)} · ${((x.input_tokens || 0) + (x.output_tokens || 0)).toLocaleString('fr-FR')} tokens · ${x.web_search_calls} recherche(s) Web · ${(x.duration_ms / 1000).toFixed(1)} s</p>
+    ${x.error_detail ? `<pre class="log">${esc(x.error_detail)}</pre>` : ''}${x.response_text ? `<pre class="log">${esc(x.response_text)}</pre>` : ''}</details>`).join('') || 'Aucun appel.';
+  $('sources').innerHTML = sources.error ? 'Indisponible.' : (sources.data || []).map((s) => `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--stroke)"><span><strong>${esc(s.name)}</strong><br><span class="small">${esc(s.host)} · ${s.origin === 'discovered' ? 'découverte' : 'de départ'} · ${s.verified_articles} article(s)</span></span></div>`).join('') || 'Aucune source.';
+  loadHistorical();
+}
+async function loadHistorical() {
+  const c = $('historical'); if (!c) return;
+  try {
+    const [cat, hidden] = await Promise.all([fetch('../historical-articles.json', { cache: 'no-store' }), client.rpc('list_hidden_article_slugs')]);
+    if (!cat.ok) throw Error('catalogue indisponible');
+    const list = await cat.json(); const hid = new Set((hidden.data || []).map((x) => x.slug));
+    const items = (Array.isArray(list) ? list : []).filter((x) => x.slug && x.title && !hid.has(x.slug));
+    c.innerHTML = items.length ? items.map((x) => `<div class="row" style="padding:10px 0;border-bottom:1px solid var(--stroke)"><span style="font-size:14px">${esc(x.title)}</span><button class="btn btn-danger" style="flex:none;min-height:38px;font-size:13px" data-slug="${esc(x.slug)}">Retirer</button></div>`).join('') : 'Aucun article historique actif.';
+    for (const b of c.querySelectorAll('[data-slug]')) armTwoStep(b, 'Confirmer', async () => {
+      const { error } = await client.rpc('remove_editorial_article', { p_slug: b.dataset.slug });
+      if (error) return toast('Impossible : ' + error.message, true);
+      toast('Article retiré du site.'); loadHistorical();
+    });
+  } catch (e) { c.textContent = 'Impossible de charger les anciens articles : ' + e.message; }
+}
+
+/* ============================================================
+   Boutons à confirmation (deux appuis, pas de fenêtre système)
+   ============================================================ */
+function armTwoStep(btn, confirmLabel, action) {
+  const original = btn.innerHTML; let armed = false, timer;
+  btn.onclick = async () => {
+    if (state.busy) return;
+    if (!armed) {
+      armed = true; btn.classList.add('confirm'); btn.textContent = confirmLabel;
+      timer = setTimeout(() => { armed = false; btn.classList.remove('confirm'); btn.innerHTML = original; }, 4000);
+      return;
+    }
+    clearTimeout(timer); btn.disabled = true; await action(); btn.disabled = false;
+  };
+}
+
+/* ============================================================
+   Feuilles
+   ============================================================ */
+function openLayer(html) {
+  $('layer').innerHTML = `<div class="sheet-bg" id="sheet-bg"></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`;
+  $('sheet-bg').onclick = closeLayer;
+}
+function closeLayer() { $('layer').innerHTML = ''; }
+
+function openReject(d) {
+  let category = '';
+  openLayer(`<h2>Refuser l’article</h2><p class="help">Votre raison aide la veille à mieux choisir les prochains sujets.</p>
+    <div class="reasons" id="reasons">${Object.entries(REASONS).map(([k, v]) => `<button class="reason" aria-pressed="false" data-k="${k}">${esc(v)}</button>`).join('')}</div>
+    <label class="f" for="reason-text">Précision <span class="small">(facultatif)</span></label>
+    <textarea class="input" id="reason-text" maxlength="1500" placeholder="Ex. Groupe trop confidentiel pour nous ; privilégier les grands festivals."></textarea>
+    <label class="check"><input type="checkbox" id="reason-future" checked><span>Tenir compte de mon avis pour les prochains articles</span></label>
+    <div class="sheet-actions"><button class="btn btn-ghost" id="cancel">Annuler</button><button class="btn btn-danger" id="confirm-reject" style="flex:1.4">Refuser</button></div>`);
+  for (const b of document.querySelectorAll('#reasons [data-k]')) b.onclick = () => {
+    category = b.dataset.k;
+    for (const o of document.querySelectorAll('#reasons [data-k]')) o.setAttribute('aria-pressed', String(o === b));
+    if (category === 'doublon' && !$('reason-text').value) $('reason-text').value = 'Cette annonce a déjà fait l’objet d’un article sur BACKSTAGE.';
+  };
+  $('cancel').onclick = closeLayer;
+  $('confirm-reject').onclick = async () => {
+    const text = $('reason-text').value.trim();
+    if (!category && !text) return decide(d, 'rejected');
+    const reason = text.length >= 8 ? text : (REASONS[category] || 'Refus') + (text ? ' — ' + text : '') + '.';
+    await rejectWithFeedback(d, category || 'autre', reason.padEnd(8, '.'), $('reason-future').checked);
+  };
+}
+
+function openMore(d) {
+  openLayer(`<h2>Plus d’actions</h2>
+    <button class="menu-item" id="m-images">🖼️ Gérer les images</button>
+    ${safeUrl(d.payload?.article?.sources?.[0]?.url) ? `<a class="menu-item" style="color:inherit;text-decoration:none" href="${esc(d.payload.article.sources[0].url)}" target="_blank" rel="noopener">🔗 Ouvrir la source officielle</a>` : ''}
+    <button class="menu-item danger" id="m-delete">🗑️ Supprimer cet article</button>`);
+  $('m-images').onclick = () => openImages(d);
+  armTwoStep($('m-delete'), 'Appuyez encore pour supprimer définitivement', async () => { closeLayer(); await removeDraft(d); });
+}
+
+function openImages(d) {
+  const a = d.payload?.article || {}; const h = a.heroImage || {};
+  openLayer(`<h2>Images</h2><p class="help">Uniquement des images dont la publication est autorisée. Crédit et texte alternatif obligatoires.</p>
+    <label class="f">Image de couverture (URL https)</label><input class="input" id="hero-url" type="url" value="${esc(h.url || '')}" placeholder="https://…">
+    <label class="f">Texte alternatif</label><input class="input" id="hero-alt" value="${esc(h.alt || '')}">
+    <label class="f">Légende</label><input class="input" id="hero-caption" value="${esc(h.caption || '')}">
+    <label class="f">Crédit</label><input class="input" id="hero-credit" value="${esc(h.credit || '')}">
+    <label class="f">Illustrations dans l’article</label>
+    <p class="small">Une par ligne : URL | texte alternatif | légende | crédit | n° de section (0 = après la première)</p>
+    <textarea class="input" id="inline-lines">${esc((a.inlineImages || []).map((x) => [x.url, x.alt, x.caption || '', x.credit, x.afterSection].join(' | ')).join('\n'))}</textarea>
+    <label class="check"><input type="checkbox" id="rights"><span>Je confirme avoir le droit de publier ces images</span></label>
+    <div class="sheet-actions"><button class="btn btn-ghost" id="cancel">Annuler</button><button class="btn btn-primary" id="save-images">Enregistrer</button></div>`);
+  $('cancel').onclick = closeLayer;
+  $('save-images').onclick = () => saveImages(d);
+}
+
+/* ============================================================
+   Actions
+   ============================================================ */
+function nextPendingAfter(d) {
+  const list = byStatus('pending'); const i = list.findIndex((x) => x.id === d.id);
+  return (list[i + 1] || list[i - 1] || null)?.id || null;
+}
+async function run(label, fn) {
+  if (state.busy) return false; state.busy = true;
+  try { await fn(); return true; } catch (e) { toast(label + ' : ' + (e.message || e), true); return false; } finally { state.busy = false; }
+}
+async function decide(d, status) {
+  const next = nextPendingAfter(d);
+  const ok = await run('Décision non enregistrée', async () => {
+    const { error } = await client.rpc('decide_editorial_draft', { p_draft_id: d.id, p_decision: status }); if (error) throw error;
+  });
+  if (!ok) return;
+  closeLayer();
+  toast(status === 'published' ? 'Publié ✓' : 'Refusé');
+  await loadAll(); go('pending', window.innerWidth < 900 ? null : next, false);
+  history.replaceState(null, '', '#/pending');
+}
+async function rejectWithFeedback(d, category, reason, future) {
+  const ok = await run('Refus non enregistré', async () => {
+    const { error } = await client.rpc('reject_editorial_draft_with_feedback', { p_draft_id: d.id, p_category: category, p_reason: reason, p_apply_to_future: future });
+    if (error) throw error;
+  });
+  if (!ok) return;
+  closeLayer(); toast(future ? 'Refusé · avis enregistré' : 'Refusé');
+  const next = nextPendingAfter(d);
+  await loadAll(); go('pending', window.innerWidth < 900 ? null : next, false);
+  history.replaceState(null, '', '#/pending');
+}
+async function removeDraft(d) {
+  const ok = await run('Suppression impossible', async () => {
+    const { error } = await client.rpc('remove_editorial_article', { p_draft_id: d.id }); if (error) throw error;
+  });
+  if (!ok) return;
+  toast('Article supprimé'); await loadAll(); go(state.tab, null, false); history.replaceState(null, '', '#/' + state.tab);
+}
+async function reviewLead(l, decision, date) {
+  const ok = await run('Décision non enregistrée', async () => {
+    const { error } = await client.rpc('review_editorial_lead', { p_lead_id: l.id, p_decision: decision, p_publication_date: date || null });
+    if (error) throw error;
+  });
+  if (!ok) return;
+  toast(decision === 'verified' ? 'Piste validée : rédaction au prochain passage' : 'Piste écartée');
+  await loadAll(); go('leads', null, false); history.replaceState(null, '', '#/leads');
+}
+async function saveImages(d) {
+  const url = $('hero-url').value.trim(), alt = $('hero-alt').value.trim(), caption = $('hero-caption').value.trim(), credit = $('hero-credit').value.trim();
+  const lines = $('inline-lines').value.split('\n').map((s) => s.trim()).filter(Boolean);
+  if ((url || lines.length) && !$('rights').checked) return toast('Confirmez les droits de publication des images.', true);
+  if (url && (!safeUrl(url) || !alt || !credit)) return toast('Couverture : URL https, texte alternatif et crédit obligatoires.', true);
+  if (lines.length > 4) return toast('Quatre illustrations maximum.', true);
+  const nSections = (d.payload?.article?.sections || []).length; const inline = [];
+  for (const line of lines) {
+    const p = line.split('|').map((x) => x.trim()); const pos = Number(p[4]);
+    if (p.length !== 5 || !safeUrl(p[0]) || !p[1] || !p[3] || !Number.isInteger(pos) || pos < 0 || pos > nSections) return toast('Ligne incorrecte : URL | alt | légende | crédit | n° de section', true);
+    inline.push({ url: p[0], alt: p[1], caption: p[2], credit: p[3], afterSection: pos });
+  }
+  const ok = await run('Enregistrement impossible', async () => {
+    const { error } = await client.rpc('update_editorial_draft_images', { p_draft_id: d.id, p_hero: url ? { url, alt, caption, credit } : null, p_inline: inline });
+    if (error) throw error;
+  });
+  if (ok) { closeLayer(); toast('Images enregistrées'); await loadAll(); }
+}
+
+/* ============================================================
+   Démarrage
+   ============================================================ */
+function showApp(on) { $('login').hidden = on; $('app').hidden = !on; }
+async function init() {
+  // Point d'entrée des tests automatisés (client simulé) ; inactif en production.
+  if (window.__BACKSTAGE_TEST_CLIENT__) client = window.__BACKSTAGE_TEST_CLIENT__;
+  else {
+    const valid = SUPABASE_URL.startsWith('https://') && SUPABASE_PUBLISHABLE_KEY.length > 24;
+    if (!valid) { $('setup').hidden = false; return; }
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.58.0');
+    client = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  }
+  $('login-form').onsubmit = async (e) => {
+    e.preventDefault(); $('send').disabled = true;
+    try { const { error } = await client.auth.signInWithPassword({ email: $('email').value.trim(), password: $('password').value }); if (error) throw error; $('password').value = ''; }
+    catch (err) { toast('Connexion impossible : ' + err.message, true); } finally { $('send').disabled = false; }
+  };
+  $('logout').onclick = async () => { await client.auth.signOut(); location.hash = ''; location.reload(); };
+  $('refresh').onclick = async () => { await loadAll(); toast('À jour'); };
+  readHash();
+  const { data: { session } } = await client.auth.getSession();
+  showApp(!!session);
+  if (session) await loadAll();
+  client.auth.onAuthStateChange((_e, s) => { const was = !$('app').hidden; showApp(!!s); if (s && !was) loadAll(); });
+  // Rafraîchir en revenant sur l'onglet (ex. après une notification).
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('app').hidden && !state.busy) loadAll(); });
+}
+init().catch((e) => toast('Erreur : ' + e.message, true));
 </script>
 </body>
 </html>
