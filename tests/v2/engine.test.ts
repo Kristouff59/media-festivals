@@ -330,3 +330,16 @@ test("Rock en Seine 2027 : l'annulation est reconnue comme déjà couverte, une 
     official_url: "https://www.leparisien.fr/z" });
   assert.equal(classifyStory(edition2028, known).verdict, "new");
 });
+
+test("Zone couverte : France, voisins et Pays-Bas oui ; Royaume-Uni si important ; ailleurs non", async () => {
+  const { inZone } = await import("../../supabase/functions/backstage-pipeline/mapping.ts");
+  assert.equal(inZone(["FR"]), true);
+  assert.equal(inZone(["be"]), true);
+  assert.equal(inZone(["NL"]), true);
+  assert.equal(inZone(["US", "DE"]), true);           // tournée qui passe par l'Allemagne
+  assert.equal(inZone(["UK"], 60), false);            // Royaume-Uni, annonce secondaire
+  assert.equal(inZone(["GB"], 90), true);             // Glastonbury annulé, par exemple
+  assert.equal(inZone(["US"], 95), false);            // Kilby Block Party
+  assert.equal(inZone(["MX", "CA"]), false);
+  assert.equal(inZone([]), true);                     // pays inconnu : la vérification tranche
+});

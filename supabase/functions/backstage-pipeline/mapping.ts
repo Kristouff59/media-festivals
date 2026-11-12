@@ -42,6 +42,29 @@ export function leadsFromV18Discovery(responseText: string) {
 const KINDS = ["lineup", "tour", "concert", "cancellation", "industry", "other"];
 
 /**
+ * Zone couverte par BACKSTAGE (décision de la rédaction, 12 novembre 2026) :
+ * la France, ses pays frontaliers et les Pays-Bas ; le Royaume-Uni seulement
+ * pour les annonces importantes.
+ */
+export const CORE_COUNTRIES = ["FR", "BE", "LU", "DE", "CH", "IT", "ES", "AD", "MC", "NL"];
+export const UK_MIN_PRIORITY = 75;
+const COUNTRY_ALIASES: Record<string, string> = { UK: "GB", EN: "GB", ENG: "GB", SCO: "GB", WAL: "GB" };
+
+export function normalizeCountries(list: unknown): string[] {
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.map((c) => String(c ?? "").trim().toUpperCase()).map((c) => COUNTRY_ALIASES[c] ?? c)
+    .filter((c) => /^[A-Z]{2}$/.test(c)))];
+}
+
+/** Vrai si la piste concerne la zone couverte. Sans pays connu, on laisse la vérification trancher. */
+export function inZone(countries: unknown, priority = 50): boolean {
+  const list = normalizeCountries(countries);
+  if (!list.length) return true;
+  if (list.some((c) => CORE_COUNTRIES.includes(c))) return true;
+  return list.includes("GB") && priority >= UK_MIN_PRIORITY;
+}
+
+/**
  * Nettoie une piste avant insertion : une seule valeur hors des contraintes de la table
  * (ex. edition = 35 pour « 35 years ») faisait échouer TOUT le passage du 11 novembre.
  */
@@ -56,6 +79,7 @@ export function leadRow(l: any, slot: string, shadow: boolean) {
     official_url: l.official_url, canonical_url: canonicalUrl(l.official_url),
     event_name: l.event_name ? String(l.event_name).slice(0, 200) : null, edition,
     kind: l.kind ?? "other", artists: (l.artists ?? []).slice(0, 20), places: (l.places ?? []).slice(0, 20),
+    countries: normalizeCountries(l.countries),
     press_urls: (l.press_urls ?? []).filter((u: string) => /^https:\/\//.test(u)).slice(0, 3),
     claimed_publication_date: /^\d{4}-\d{2}-\d{2}$/.test(l.claimed_publication_date ?? "") ? l.claimed_publication_date : null,
     listing_hint: l.listing_hint ?? null, priority: Math.max(0, Math.min(100, Math.round(Number(l.priority) || 50))),
