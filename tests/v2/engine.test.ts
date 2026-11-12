@@ -343,3 +343,18 @@ test("Zone couverte : France, voisins et Pays-Bas oui ; Royaume-Uni si important
   assert.equal(inZone(["MX", "CA"]), false);
   assert.equal(inZone([]), true);                     // pays inconnu : la vérification tranche
 });
+
+test("Fils : RSS et Atom lus, fils généralistes filtrés sur la musique live", async () => {
+  const { parseFeed, selectFeedItems } = await import("../../supabase/functions/_shared/backstage/feeds.ts");
+  const atom = `<feed><entry><title>Hellfest 2027 : les premiers noms</title><link rel="alternate" href="https://ex.fr/hellfest"/>
+    <published>2026-11-12T08:00:00Z</published><summary>Programmation</summary></entry></feed>`;
+  const a = parseFeed(atom, { url: "", name: "A", country: "FR" });
+  assert.equal(a[0].url, "https://ex.fr/hellfest");
+  const rss = `<rss><item><title>Recette de la soupe</title><link>http://g.fr/soupe</link><pubDate>Thu, 12 Nov 2026 09:00:00 GMT</pubDate></item>
+    <item><title>Le Zénith annonce un concert de Muse</title><link>http://g.fr/muse</link><pubDate>Thu, 12 Nov 2026 09:00:00 GMT</pubDate></item></rss>`;
+  const g = parseFeed(rss, { url: "", name: "G", country: "FR", general: true });
+  assert.equal(g[1].url, "https://g.fr/muse");
+  const kept = selectFeedItems([...a, ...g, { ...a[0], source: "B" }], { now: Date.parse("2026-11-12T12:00:00Z"), maxAgeHours: 16,
+    seenUrls: new Set(), generalSources: new Set(["G"]), max: 10, priorityNames: ["Hellfest"] });
+  assert.deepEqual(kept.map((k) => k.title), ["Hellfest 2027 : les premiers noms", "Le Zénith annonce un concert de Muse"]);
+});

@@ -17,6 +17,7 @@ function harness(mode: "shadow" | "live") {
     editorial_feedback: [], editorial_sources: [],
   };
   let openaiCalls = 0, id = 0;
+  const replies: Record<string, unknown> = {};
   const web: Record<string, string> = { [MA]: fx("rw-massive-attack.html") };
 
   const match = (row: Row, params: URLSearchParams) => {
@@ -73,8 +74,10 @@ function harness(mode: "shadow" | "live") {
         category: "FESTIVALS", format: "breve", body: [p.repeat(3), p.repeat(2)],
         sections: [{ title: "Billetterie", paragraphs: ["Les combi-tickets sont en vente depuis le vendredi 30 octobre à 10 h sur le site officiel du festival, qui se tient du 1er au 4 juillet 2027."] }] };
       assert.equal(req.text.format.type, "json_schema");
+      const reply = replies[req.text.format.name] ?? art;
+      if (req.text.format.name === "tri_flux") assert.equal(req.tools, undefined, "le tri des flux n'utilise pas la recherche Web");
       return Response.json({ id: "resp", status: "completed", model: "test", usage: {},
-        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(art) }] }] });
+        output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(reply) }] }] });
     }
     if (web[url]) return new Response(web[url], { status: 200, headers: { "content-type": "text/html" } });
     return new Response("nope", { status: 404, headers: { "content-type": "text/html" } });
@@ -89,7 +92,7 @@ function harness(mode: "shadow" | "live") {
   (globalThis as any).fetch = fakeFetch;
   Date.now = () => FIXED;
   return {
-    tables, web, get openaiCalls() { return openaiCalls; },
+    tables, web, replies, get openaiCalls() { return openaiCalls; },
     // Chaque test charge sa propre instance de la fonction (le module est mis en cache par URL).
     load: async () => { await import("../../supabase/functions/backstage-pipeline/index.ts?" + mode + "-" + (++loads)); },
     call: async (body: unknown, key = "sb_secret_test") => {
@@ -180,5 +183,36 @@ test("Mode réel : une piste déjà couverte par un article publié n'est pas r�
   assert.equal(h.openaiCalls, 0);
   assert.equal(h.tables.editorial_leads[0].status, "duplicate");
   assert.equal(h.tables.editorial_drafts.length, 1);
+  Date.now = realNow;
+});
+
+test("Mode réel : les fils RSS des médias donnent une piste, triée sans recherche Web", async () => {
+  const h = harness("live");
+  await h.load();
+  const ECHOS = "https://www.lesechos.fr/pme-regions/ile-de-france/musique-pas-de-festival-rock-en-seine-a-saint-cloud-en-aout-2027-2262031";
+  h.web["https://www.francetvinfo.fr/culture/musique.rss"] = `<?xml version="1.0"?><rss><channel>
+    <item><title><![CDATA[Rock en Seine annulé en 2027 en raison de travaux]]></title><link>${ECHOS}</link>
+    <pubDate>Mon, 02 Nov 2026 05:00:00 GMT</pubDate><description>Le festival fait une pause.</description></item>
+    <item><title>Critique : le nouvel album de X</title><link>https://www.francetvinfo.fr/critique-x</link>
+    <pubDate>Sun, 01 Nov 2026 22:00:00 GMT</pubDate></item>
+    <item><title>Vieux sujet</title><link>https://www.francetvinfo.fr/vieux</link><pubDate>Mon, 20 Oct 2026 08:00:00 GMT</pubDate></item>
+  </channel></rss>`;
+  const lead = { title: "Rock en Seine annule son édition 2027", why_now: "n=0 : annulation", official_url: "https://invente.example/x",
+    event_name: "Rock en Seine", edition: 2027, kind: "cancellation", artists: [], places: ["Saint-Cloud"], countries: ["FR"],
+    press_urls: [], claimed_publication_date: null, priority: 95 };
+  h.replies.decouverte = { leads: [] };
+  h.replies.veille_festivals = { leads: [] };
+  h.replies.tri_flux = { leads: [lead, { ...lead, title: "Festival lointain", why_now: "n=1 : x", countries: ["US"], priority: 50 }] };
+  const res = await h.call({ stage: "tick" });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  const req = h.tables.editorial_ai_logs.find((l) => l.stage === "tri_flux")!;
+  assert.ok(req, JSON.stringify(res.json) + JSON.stringify(h.tables.editorial_ai_logs.map((l) => [l.stage, l.status, l.error_detail])));
+  assert.ok(req.request_text.includes("Rock en Seine annulé en 2027"));
+  assert.ok(!req.request_text.includes("Vieux sujet"), "les titres trop anciens ne sont pas envoyés");
+  const leads = h.tables.editorial_leads.filter((l) => l.channel === "flux");
+  assert.equal(leads.length, 1, "la piste hors zone est écartée");
+  assert.equal(leads[0].official_url, ECHOS, "l'URL vient du fil, jamais du modèle");
+  assert.equal(leads[0].claimed_publication_date, "2026-11-02");
+  assert.match(String(res.json.discovery), /flux 1\/\d+ lus, 2 titres tries, 1 pistes dont 0 en commun/);
   Date.now = realNow;
 });
