@@ -216,3 +216,17 @@ test("Mode réel : les fils RSS des médias donnent une piste, triée sans reche
   assert.match(String(res.json.discovery), /flux 1\/\d+ lus, 2 titres tries, 1 pistes dont 0 en commun/);
   Date.now = realNow;
 });
+
+test("Mode réel : le soir, pas de veille des grands festivals (la recherche la plus coûteuse)", async () => {
+  const h = harness("live");
+  await h.load();
+  Date.now = () => Date.parse("2026-11-02T17:15:00Z"); // 18 h 15 à Paris
+  h.replies.decouverte = { leads: [] };
+  const res = await h.call({ stage: "tick" });
+  assert.equal(res.status, 200, JSON.stringify(res.json));
+  const stages = h.tables.editorial_ai_logs.map((l) => l.stage);
+  assert.ok(stages.includes("decouverte"));
+  assert.ok(!stages.includes("veille_festivals"));
+  assert.match(String(res.json.discovery), /veille festivals : le matin seulement/);
+  Date.now = realNow;
+});

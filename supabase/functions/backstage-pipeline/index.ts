@@ -569,7 +569,9 @@ async function tick(key: string, input: any) {
           const feeds = await readFeeds(key).catch(() => ({ read: 0, feedsOk: 0, items: [] as FeedItem[] }));
           const [open, watch, flux] = await Promise.allSettled([
             discoverOpenAI(key, "v2-" + slot.id, signals, known, guide),
-            watchFestivals(key, "v2-" + slot.id, registry, known),
+            // Veille des grands festivals (la plus coûteuse) : une fois par jour, le matin.
+            slot.id.endsWith("-matin") || input.force === true
+              ? watchFestivals(key, "v2-" + slot.id, registry, known) : Promise.resolve([] as any[]),
             triageFeeds(key, "v2-" + slot.id, feeds.items, known, guide),
           ]);
           const ok = (r: PromiseSettledResult<any[]>) => r.status === "fulfilled" ? r.value : [];
@@ -586,7 +588,7 @@ async function tick(key: string, input: any) {
           const n = await insertLeads(key, [...rowsSearch, ...rowsFlux]);
           const outZone = searched.length + ok(flux).length - keptSearch.length - keptFlux.length;
           detail = `${signals.length} annonces officielles lues, recherche web ${keptSearch.length} pistes` +
-            ` (veille festivals : ${watch.status === "fulfilled" ? watch.value.length : "echec"})` +
+            ` (veille festivals : ${!slot.id.endsWith("-matin") && input.force !== true ? "le matin seulement" : watch.status === "fulfilled" ? watch.value.length : "echec"})` +
             `, flux ${feeds.feedsOk}/${FEEDS.length} lus, ${feeds.items.length} titres tries, ` +
             `${flux.status === "fulfilled" ? keptFlux.length : "echec"} pistes dont ${common} en commun` +
             `, hors zone : ${outZone}, ${n} nouvelles`;
