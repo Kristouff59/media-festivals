@@ -118,6 +118,9 @@ test("Mode fantôme : rejoue la découverte v18 du 2 novembre, sans OpenAI ni ar
     status: "published", created_at: "2026-10-25T08:00:00Z", payload: { article: { sources: [] } } });
   await h.load();
   assert.equal((await h.call({}, "mauvaise-cle")).status, 401);
+  const first = await h.call({ stage: "tick" });
+  assert.equal(first.status, 200, JSON.stringify(first.json));
+  assert.equal(first.json.verification, undefined, "le passage de recherche laisse la vérification au suivant");
   const res = await h.call({ stage: "tick" });
   assert.equal(res.status, 200, JSON.stringify(res.json));
   const leads = h.tables.editorial_leads;
@@ -150,7 +153,7 @@ test("Mode réel : la piste vérifiée devient UN article pending, avec preuves 
     source_text: fx("rw-massive-attack.html"), verification: { final_url: MA, corroborating_sources: [] },
     next_attempt_at: new Date(FIXED + 86400000).toISOString(),
   });
-  h.tables.editorial_radar_runs.push({ slot: "v2-2026-11-02-matin" }); // découverte déjà faite
+  h.tables.editorial_radar_runs.push({ slot: "v2-2026-11-02-matin" }, { slot: "v2-2026-11-02-matin-flux" }); // découverte déjà faite
   const res = await h.call({ stage: "tick" });
   assert.equal(res.status, 200, JSON.stringify(res.json));
   assert.equal(h.openaiCalls, 1, "une rédaction, un appel");
@@ -177,7 +180,7 @@ test("Mode réel : une piste déjà couverte par un article publié n'est pas r�
     source_text: "Helloween au Graspop Metal Meeting 2027.", verification: { corroborating_sources: [] },
     next_attempt_at: new Date(FIXED + 86400000).toISOString(),
   });
-  h.tables.editorial_radar_runs.push({ slot: "v2-2026-11-02-matin" });
+  h.tables.editorial_radar_runs.push({ slot: "v2-2026-11-02-matin" }, { slot: "v2-2026-11-02-matin-flux" });
   const res = await h.call({ stage: "tick" });
   assert.equal(res.status, 200, JSON.stringify(res.json));
   assert.equal(h.openaiCalls, 0);
@@ -203,7 +206,9 @@ test("Mode réel : les fils RSS des médias donnent une piste, triée sans reche
   h.replies.decouverte = { leads: [] };
   h.replies.veille_festivals = { leads: [] };
   h.replies.tri_flux = { leads: [lead, { ...lead, title: "Festival lointain", why_now: "n=1 : x", countries: ["US"], priority: 50 }] };
-  const res = await h.call({ stage: "tick" });
+  await h.call({ stage: "tick" }); // 7 h 15 : sites officiels et recherche Web
+  assert.ok(!h.tables.editorial_ai_logs.some((l) => l.stage === "tri_flux"), "les fils sont lus au passage suivant");
+  const res = await h.call({ stage: "tick" }); // 7 h 45 : fils des médias
   assert.equal(res.status, 200, JSON.stringify(res.json));
   const req = h.tables.editorial_ai_logs.find((l) => l.stage === "tri_flux")!;
   assert.ok(req, JSON.stringify(res.json) + JSON.stringify(h.tables.editorial_ai_logs.map((l) => [l.stage, l.status, l.error_detail])));
@@ -213,7 +218,7 @@ test("Mode réel : les fils RSS des médias donnent une piste, triée sans reche
   assert.equal(leads.length, 1, "la piste hors zone est écartée");
   assert.equal(leads[0].official_url, ECHOS, "l'URL vient du fil, jamais du modèle");
   assert.equal(leads[0].claimed_publication_date, "2026-11-02");
-  assert.match(String(res.json.discovery), /flux 1\/\d+ lus, 2 titres tries, 1 pistes dont 0 en commun/);
+  assert.match(String(res.json.discovery), /flux 1\/\d+ lus, 2 titres tries, 1 pistes, hors zone : 1, 1 nouvelles/);
   Date.now = realNow;
 });
 

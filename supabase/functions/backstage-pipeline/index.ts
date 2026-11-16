@@ -544,65 +544,76 @@ async function tick(key: string, input: any) {
   const discoveryDue = input.stage === "discover" || (slot.isDiscoveryHour);
   // Un lancement manuel hors créneau ne doit pas consommer le créneau 7 h / 18 h.
   if (!slot.isDiscoveryHour) slot.id = "manuel-" + new Date(Date.now()).toISOString().slice(0, 16);
-  if (discoveryDue) {
+  // Chaque étape lourde a son propre passage, pour rester sous la limite de calcul d'une fonction
+  // (incident du 15-16 novembre) : à HH:15 sites officiels + recherche Web, à HH:45 fils des médias,
+  // puis vérification et rédaction aux passages suivants.
+  const runLocked = async (lockSlot: string, work: () => Promise<string>) => {
     const lock = await db("editorial_radar_runs?on_conflict=slot", key, "POST",
-      [{ slot: "v2-" + slot.id, status: "running" }], "resolution=ignore-duplicates,return=representation");
-    if (lock.length || input.force === true) {
-      let detail = "";
-      try {
-        if (MODE === "shadow") {
-          // Rejouer les découvertes déjà payées par la v18 : zéro coût, même entrée.
-          const logs: any[] = await db("editorial_ai_logs?select=response_text,slot&stage=eq.decouverte&status=eq.completed" +
-            "&order=created_at.desc&limit=" + (input.replay_runs ?? 2), key);
-          const leads = logs.flatMap((l) => leadsFromV18Discovery(l.response_text));
-          const n = await insertLeads(key, leads.map((l) => leadRow(l, slot.id, true)));
-          detail = `fantome: ${leads.length} pistes v18 rejouees, ${n} nouvelles`;
-        } else {
-          const [signals, known, guide, registry] = await Promise.all([
-            officialSignals(key),
-            db("editorial_leads?select=title&status=in.(verified,written,duplicate,needs_review)&order=created_at.desc&limit=80", key)
-              .then((r: any[]) => r.map((x) => x.title)).catch(() => []),
-            guidance(key),
-            db("editorial_sources?select=name&status=eq.active&source_kind=eq.festival&limit=60", key)
-              .then((r: any[]) => r.map((x) => x.name)).catch(() => []),
-          ]);
-          const feeds = await readFeeds(key).catch(() => ({ read: 0, feedsOk: 0, items: [] as FeedItem[] }));
-          const [open, watch, flux] = await Promise.allSettled([
-            discoverOpenAI(key, "v2-" + slot.id, signals, known, guide),
-            // Veille des grands festivals (la plus coûteuse) : une fois par jour, le matin.
-            slot.id.endsWith("-matin") || input.force === true
-              ? watchFestivals(key, "v2-" + slot.id, registry, known) : Promise.resolve([] as any[]),
-            triageFeeds(key, "v2-" + slot.id, feeds.items, known, guide),
-          ]);
-          const ok = (r: PromiseSettledResult<any[]>) => r.status === "fulfilled" ? r.value : [];
-          const searched = [...ok(open), ...ok(watch)];
-          if (open.status === "rejected" && watch.status === "rejected" && flux.status === "rejected") throw open.reason;
-          // Zone couverte : contrôle serveur, quoi que réponde le modèle.
-          const inArea = (l: any) => inZone(l.countries, Number(l.priority) || 50);
-          const keptSearch = searched.filter(inArea), keptFlux = ok(flux).filter(inArea);
-          // Comparaison des deux méthodes (avant de réduire la recherche Web) : même récit = même story_key.
-          const rowsSearch = keptSearch.map((l) => leadRow(l, slot.id, false));
-          const rowsFlux = keptFlux.map((l) => leadRow(l, slot.id, false));
-          const keys = new Set(rowsSearch.map((r) => r.story_key));
-          const common = rowsFlux.filter((r) => keys.has(r.story_key)).length;
-          const n = await insertLeads(key, [...rowsSearch, ...rowsFlux]);
-          const outZone = searched.length + ok(flux).length - keptSearch.length - keptFlux.length;
-          detail = `${signals.length} annonces officielles lues, recherche web ${keptSearch.length} pistes` +
-            ` (veille festivals : ${!slot.id.endsWith("-matin") && input.force !== true ? "le matin seulement" : watch.status === "fulfilled" ? watch.value.length : "echec"})` +
-            `, flux ${feeds.feedsOk}/${FEEDS.length} lus, ${feeds.items.length} titres tries, ` +
-            `${flux.status === "fulfilled" ? keptFlux.length : "echec"} pistes dont ${common} en commun` +
-            `, hors zone : ${outZone}, ${n} nouvelles`;
-        }
-        report.discovery = detail;
-      } catch (e) {
-        detail = "erreur : " + String((e as Error)?.message || e).slice(0, 200);
-        report.discovery = detail;
-      } finally {
-        await db("editorial_radar_runs?slot=eq.v2-" + slot.id, key, "PATCH", {
-          status: detail.startsWith("erreur") ? "failed" : "completed", detail: detail.slice(0, 440),
-          finished_at: new Date().toISOString() }, "return=minimal").catch(() => {});
-      }
+      [{ slot: lockSlot, status: "running" }], "resolution=ignore-duplicates,return=representation");
+    if (!lock.length && input.force !== true) return false;
+    let detail = "";
+    try {
+      detail = await work();
+    } catch (e) {
+      detail = "erreur : " + String((e as Error)?.message || e).slice(0, 200);
+    } finally {
+      await db("editorial_radar_runs?slot=eq." + lockSlot, key, "PATCH", {
+        status: detail.startsWith("erreur") ? "failed" : "completed", detail: detail.slice(0, 440),
+        finished_at: new Date().toISOString() }, "return=minimal").catch(() => {});
     }
+    report.discovery = detail;
+    return true;
+  };
+  const known = () => db("editorial_leads?select=title&status=in.(verified,written,duplicate,needs_review)" +
+    "&order=created_at.desc&limit=80", key).then((r: any[]) => r.map((x) => x.title)).catch(() => [] as string[]);
+  const inArea = (l: any) => inZone(l.countries, Number(l.priority) || 50);
+  let heavy = false;
+  if (discoveryDue && MODE === "shadow") {
+    heavy = await runLocked("v2-" + slot.id, async () => {
+      // Rejouer les découvertes déjà payées par la v18 : zéro coût, même entrée.
+      const logs: any[] = await db("editorial_ai_logs?select=response_text,slot&stage=eq.decouverte&status=eq.completed" +
+        "&order=created_at.desc&limit=" + (input.replay_runs ?? 2), key);
+      const leads = logs.flatMap((l) => leadsFromV18Discovery(l.response_text));
+      const n = await insertLeads(key, leads.map((l) => leadRow(l, slot.id, true)));
+      return `fantome: ${leads.length} pistes v18 rejouees, ${n} nouvelles`;
+    });
+  } else if (discoveryDue) {
+    heavy = await runLocked("v2-" + slot.id, async () => {
+      const [signals, titles, guide, registry] = await Promise.all([
+        officialSignals(key), known(), guidance(key),
+        db("editorial_sources?select=name&status=eq.active&source_kind=eq.festival&limit=60", key)
+          .then((r: any[]) => r.map((x) => x.name)).catch(() => []),
+      ]);
+      // Veille des grands festivals (la plus coûteuse) : une fois par jour, le matin.
+      const morning = slot.id.endsWith("-matin") || input.force === true;
+      const [open, watch] = await Promise.allSettled([
+        discoverOpenAI(key, "v2-" + slot.id, signals, titles, guide),
+        morning ? watchFestivals(key, "v2-" + slot.id, registry, titles) : Promise.resolve([] as any[]),
+      ]);
+      if (open.status === "rejected" && watch.status === "rejected") throw open.reason;
+      const leads = [...(open.status === "fulfilled" ? open.value : []), ...(watch.status === "fulfilled" ? watch.value : [])];
+      // Zone couverte : contrôle serveur, quoi que réponde le modèle.
+      const kept = leads.filter(inArea);
+      const n = await insertLeads(key, kept.map((l) => leadRow(l, slot.id, false)));
+      return `${signals.length} annonces officielles lues, recherche web ${kept.length} pistes` +
+        ` (veille festivals : ${!morning ? "le matin seulement" : watch.status === "fulfilled" ? watch.value.length : "echec"})` +
+        `, hors zone : ${leads.length - kept.length}, ${n} nouvelles`;
+    });
+    if (!heavy) {
+      heavy = await runLocked("v2-" + slot.id + "-flux", async () => {
+        const [feeds, titles, guide] = await Promise.all([readFeeds(key), known(), guidance(key)]);
+        const leads = await triageFeeds(key, "v2-" + slot.id, feeds.items, titles, guide);
+        const kept = leads.filter(inArea);
+        const n = await insertLeads(key, kept.map((l) => leadRow(l, slot.id, false)));
+        return `flux ${feeds.feedsOk}/${FEEDS.length} lus, ${feeds.items.length} titres tries, ${kept.length} pistes` +
+          `, hors zone : ${leads.length - kept.length}, ${n} nouvelles`;
+      });
+    }
+  }
+  // Un passage qui a fait une recherche laisse la vérification et la rédaction au suivant.
+  if (heavy) {
+    report.duration_ms = Date.now() - started;
+    return report;
   }
   report.verification = await verifyQueue(key, deadline);
   if (MODE === "live" && Date.now() < deadline - 65000) {
