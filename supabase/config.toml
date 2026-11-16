@@ -2,3 +2,7 @@
 # dans l'en-tête apikey. Elle vérifie elle-même ce secret avant tout appel OpenAI.
 [functions.backstage-radar]
 verify_jwt = false
+
+# BACKSTAGE v2 : même principe, clé serveur vérifiée dans la fonction.
+[functions.backstage-pipeline]
+verify_jwt = false

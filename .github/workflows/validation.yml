@@ -6,6 +6,7 @@ on:
       - 'index.html'
       - 'admin/**'
       - 'supabase/functions/**'
+      - 'supabase/migration-v2-pipeline.sql'
       - 'supabase/migration-radar.sql'
       - 'supabase/migration-editorial-feedback.sql'
       - 'supabase/migration-ai-logs.sql'
@@ -35,6 +36,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Vérifier la syntaxe JavaScript du site
         shell: bash
         run: |
@@ -49,6 +53,8 @@ jobs:
           node --check /tmp/backstage-scripts.js
       - name: Tester le nouveau radar autonome, sans appeler les API
         run: node tests/backstage-radar.test.mjs
+      - name: Tester le pipeline v2 (moteur de preuves, récits, fonction Edge simulée)
+        run: node --test tests/v2/engine.test.ts tests/v2/pipeline.test.ts
       - name: Vérifier le JavaScript de la rédaction
         shell: bash
         run: |
