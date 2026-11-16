@@ -110,14 +110,15 @@ async function officialSignals(key: string): Promise<Signal[]> {
     if (!p.ok) return [];
     const host = new URL(p.finalUrl).hostname.replace(/^www\./, "");
     const seen = new Set<string>(), out: Signal[] = [];
-    for (const l of parseLinks(p.html, p.finalUrl)) {
+    const links = parseLinks(p.html, p.finalUrl);
+    for (const l of links) {
       const key = canonicalUrl(l.href);
       let u: URL;
       try { u = new URL(l.href); } catch { continue; }
       if (seen.has(key) || u.hostname.replace(/^www\./, "") !== host) continue;
       if (u.pathname.split("/").filter(Boolean).length < 2 || l.text.length < 12) continue;
       seen.add(key);
-      const ev = listingEvidence(p.html, p.finalUrl, { url: l.href, title: l.text }, now);
+      const ev = listingEvidence(p.html, p.finalUrl, { url: l.href, title: l.text }, now, links);
       if (!ev) continue;
       const age = (now - Date.parse(ev.date)) / 86400000;
       if (age >= -1 && age <= MAX_AGE_DAYS) out.push({ url: l.href, title: l.text.slice(0, 200), date: ev.date, source: s.name });
@@ -243,7 +244,7 @@ const FEED_WINDOW_HOURS = 16;
 async function readFeeds(key: string) {
   const seen: any[] = await db("editorial_leads?select=official_url&order=created_at.desc&limit=500", key).catch(() => []);
   const lists = await Promise.all(FEEDS.map(async (f) => {
-    const p = await fetchPage(f.url, { maxBytes: 2_000_000, timeoutMs: 10000 });
+    const p = await fetchPage(f.url, { maxBytes: 400_000, timeoutMs: 10000 });
     return p.ok ? parseFeed(p.html, f) : [];
   }));
   const all = lists.flat();
@@ -632,6 +633,12 @@ Deno.serve(async (req) => {
       const f = await readFeeds(key);
       return Response.json({ read: f.read, feedsOk: f.feedsOk, total: FEEDS.length, selected: f.items.length,
         sample: f.items.slice(0, 15).map((i) => [i.source, i.date.slice(0, 16), i.title]) });
+    }
+    // Lecture des sites officiels seule (gratuite) : pour mesurer son coût de calcul.
+    if (input.stage === "signals_preview") {
+      const t = Date.now();
+      const s = await officialSignals(key);
+      return Response.json({ signals: s.length, ms: Date.now() - t });
     }
     return Response.json(await tick(key, input));
   } catch (e) {

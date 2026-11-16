@@ -2,7 +2,7 @@
 // Chaque indice devient une preuve typée, pondérée et traçable.
 // Une date de concert, de billetterie ou d'historique n'est jamais une
 // date de publication : on l'écarte par sa position et par son contexte.
-import type { ParsedPage } from "./html.ts";
+import type { PageLink, ParsedPage } from "./html.ts";
 import { htmlAttr, htmlToText, parseLinks } from "./html.ts";
 import { findDates, parseDateValue } from "./dates.ts";
 import { canonicalUrl, norm } from "./text.ts";
@@ -124,8 +124,10 @@ export function pageEvidence(page: ParsedPage, now = Date.now()): DateEvidence[]
  */
 export function listingEvidence(
   listingHtml: string, listingUrl: string, target: { url: string; title?: string }, now = Date.now(),
+  parsedLinks?: PageLink[],
 ): DateEvidence | null {
-  const links = parseLinks(listingHtml, listingUrl);
+  // Les liens peuvent être fournis déjà analysés : un sommaire de 300 liens n'est alors lu qu'une fois.
+  const links = parsedLinks ?? parseLinks(listingHtml, listingUrl);
   const targetKey = canonicalUrl(target.url);
   const titleKey = norm(target.title);
   const hits = links.filter((l) => canonicalUrl(l.href) === targetKey ||

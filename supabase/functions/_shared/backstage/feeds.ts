@@ -25,7 +25,6 @@ export const FEEDS: Feed[] = [
   { url: "https://www.musikexpress.de/feed/", name: "Musikexpress", country: "DE" },
   { url: "https://www.festivalfans.nl/feed/", name: "FestivalFans", country: "NL" },
   { url: "https://www.nme.com/news/music/feed", name: "NME", country: "GB" },
-  { url: "https://www.loudersound.com/feeds/all", name: "Louder", country: "GB" },
 ];
 
 // Pour les fils généralistes : on ne garde que ce qui parle de musique live.
