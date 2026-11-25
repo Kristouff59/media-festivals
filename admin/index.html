@@ -76,6 +76,11 @@ body.reading .reader-pane{display:block}
 .empty{padding:32px 10px;text-align:center;color:var(--muted)}
 .empty strong{display:block;color:var(--text);font-size:17px;margin-bottom:6px}
 .more{width:100%;margin-top:10px;padding:12px;border:1px dashed var(--stroke2);border-radius:12px;color:var(--muted)}
+.more.tidy{margin:0 0 12px}
+.tidy-list{list-style:none;margin:14px 0 0;padding:0;max-height:40vh;overflow:auto}
+.tidy-list li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--stroke);font-size:14px}
+.tidy-list li span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tidy-list .small{flex:none}
 .search{width:100%;margin:0 0 12px;padding:11px 13px;border-radius:11px;border:1px solid var(--stroke);background:var(--bg2)}
 
 /* ---------- Lecteur ---------- */
@@ -342,6 +347,7 @@ function draftCard(d) {
   if (a.category) chips.push(`<span class="chip">${esc(a.category)}</span>`);
   if (d.status === 'pending' && warn) chips.push(`<span class="chip warn">${warn} point${warn > 1 ? 's' : ''} à vérifier</span>`);
   if (d.status === 'rejected' && fb) chips.push(`<span class="chip bad">${esc(REASONS[fb.category] || 'Refusé')}</span>`);
+  else if (d.status === 'rejected' && d.quality?.expired) chips.push('<span class="chip">Trop ancien</span>');
   if (d.status === 'published') chips.push('<span class="chip ok">En ligne</span>');
   const date = d.status === 'published' ? (d.published_at || d.decided_at || d.created_at) : d.created_at;
   return `<button class="card${state.selected === d.id ? ' active' : ''}" data-id="${esc(d.id)}">
@@ -378,6 +384,7 @@ function renderList() {
         ? '<div class="empty"><strong>Tout est traité 🎉</strong>Aucun article en attente. La veille continue à 7 h et 18 h.</div>'
         : '<div class="empty">Aucun article.</div>';
     } else {
+      if (state.tab === 'pending' && items.length > 1) html += '<button class="more tidy" id="tidy">🧹 Faire le tri des articles trop anciens</button>';
       html += '<div class="cards">' + shown.map(draftCard).join('') + '</div>';
       if (items.length > shown.length) html += `<button class="more" id="more">Afficher plus (${items.length - shown.length})</button>`;
     }
@@ -386,6 +393,7 @@ function renderList() {
   for (const c of pane.querySelectorAll('[data-id]')) c.onclick = () => go(state.tab, c.dataset.id);
   const s = $('search'); if (s) s.oninput = () => { state.search = s.value; const pos = s.selectionStart; renderList(); const n = $('search'); n.focus(); n.setSelectionRange(pos, pos); };
   const m = $('more'); if (m) m.onclick = () => { state.limits[state.tab] += 30; renderList(); };
+  const t = $('tidy'); if (t) t.onclick = openTidy;
 }
 
 /* ---------- Lecteur d'article ---------- */
@@ -592,6 +600,34 @@ function openReject(d) {
   };
 }
 
+/* Tri en masse : les articles en attente depuis trop longtemps passent en « Refusés · Trop ancien ». */
+const TIDY_AGES = [{ days: 2, label: 'Plus de 2 jours' }, { days: 4, label: 'Plus de 4 jours' }, { days: 7, label: 'Plus de 7 jours' }];
+function openTidy() {
+  const pending = byStatus('pending');
+  const older = (days) => pending.filter((d) => Date.now() - Date.parse(d.created_at) > days * 86400000);
+  let days = (TIDY_AGES.find((a) => older(a.days).length) || TIDY_AGES[0]).days;
+  openLayer(`<h2>Faire le tri</h2><p class="help">Les articles choisis ne seront pas publiés. Ils passent dans « Refusés » avec la mention « Trop ancien », sans compter comme un avis pour la veille.</p>
+    <label class="f">Articles en attente depuis</label>
+    <div class="reasons" id="ages">${TIDY_AGES.map((a) => `<button class="reason" aria-pressed="false" data-days="${a.days}">${a.label} · ${older(a.days).length}</button>`).join('')}</div>
+    <div id="tidy-list"></div>
+    <div class="sheet-actions"><button class="btn btn-ghost" id="cancel">Annuler</button><button class="btn btn-danger" id="confirm-tidy" style="flex:1.4"></button></div>`);
+  const refresh = () => {
+    const list = older(days);
+    for (const b of document.querySelectorAll('#ages [data-days]')) b.setAttribute('aria-pressed', String(Number(b.dataset.days) === days));
+    $('tidy-list').innerHTML = list.length
+      ? `<ul class="tidy-list">${list.map((d) => `<li><span>${esc(d.title)}</span><span class="small">${esc(ago(d.created_at))}</span></li>`).join('')}</ul>`
+      : '<p class="small">Aucun article en attente depuis aussi longtemps.</p>';
+    const btn = $('confirm-tidy');
+    btn.disabled = !list.length;
+    btn.textContent = list.length ? `Retirer ${list.length} article${list.length > 1 ? 's' : ''}` : 'Rien à retirer';
+    btn.classList.remove('confirm');
+    armTwoStep(btn, `Appuyez encore pour retirer ${list.length} article${list.length > 1 ? 's' : ''}`, () => expireDrafts(list.map((d) => d.id)));
+  };
+  for (const b of document.querySelectorAll('#ages [data-days]')) b.onclick = () => { days = Number(b.dataset.days); refresh(); };
+  $('cancel').onclick = closeLayer;
+  refresh();
+}
+
 function openMore(d) {
   openLayer(`<h2>Plus d’actions</h2>
     <button class="menu-item" id="m-images">🖼️ Gérer les images</button>
@@ -656,6 +692,16 @@ async function removeDraft(d) {
   });
   if (!ok) return;
   toast('Article supprimé'); await loadAll(); go(state.tab, null, false); history.replaceState(null, '', '#/' + state.tab);
+}
+async function expireDrafts(ids) {
+  let n = 0;
+  const ok = await run('Tri impossible', async () => {
+    const { data, error } = await client.rpc('expire_editorial_drafts', { p_ids: ids }); if (error) throw error;
+    n = Number(data) || 0;
+  });
+  if (!ok) return;
+  closeLayer(); toast(n ? `${n} article${n > 1 ? 's' : ''} retiré${n > 1 ? 's' : ''}` : 'Aucun article retiré');
+  await loadAll(); go('pending', null, false); history.replaceState(null, '', '#/pending');
 }
 async function reviewLead(l, decision, date) {
   const ok = await run('Décision non enregistrée', async () => {
